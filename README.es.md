@@ -55,7 +55,7 @@ Los modelos de medios generativos están repartidos entre proveedores, paneles y
 
 ### Espacio unificado de generación
 
-![Espacio de generación de Open-Higgsfield](docs/images/open-higgsfield-studio.png)
+![Espacio de generación de Open-Higgsfield con una galería de imágenes de demostración](docs/images/open-higgsfield-workspace.png)
 
 ## Proveedores compatibles
 

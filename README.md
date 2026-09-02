@@ -55,7 +55,7 @@ AI media models are spread across providers, dashboards, payload formats, and in
 
 ### Unified generation workspace
 
-![Open-Higgsfield generation workspace](docs/images/open-higgsfield-studio.png)
+![Open-Higgsfield generation workspace with a sample image gallery](docs/images/open-higgsfield-workspace.png)
 
 ## Supported providers
 

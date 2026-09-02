@@ -55,7 +55,7 @@ Modelos de mídia generativa estão espalhados entre provedores, painéis e cont
 
 ### Workspace unificado de geração
 
-![Workspace de geração do Open-Higgsfield](docs/images/open-higgsfield-studio.png)
+![Workspace de geração do Open-Higgsfield com uma galeria de imagens demonstrativa](docs/images/open-higgsfield-workspace.png)
 
 ## Provedores suportados
 
