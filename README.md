@@ -34,7 +34,7 @@
   </p>
 </div>
 
-![Open-Higgsfield AI image and video generation studio](docs/images/open-higgsfield-studio.png)
+![Open-Higgsfield AI image and video generation studio](docs/images/open-higgsfield-cover.png)
 
 ## Why Open-Higgsfield?
 

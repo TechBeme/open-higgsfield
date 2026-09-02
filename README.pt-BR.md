@@ -34,7 +34,7 @@
   </p>
 </div>
 
-![Estúdio de geração de imagens e vídeos com IA do Open-Higgsfield](docs/images/open-higgsfield-studio.png)
+![Estúdio de geração de imagens e vídeos com IA do Open-Higgsfield](docs/images/open-higgsfield-cover.png)
 
 ## Por que Open-Higgsfield?
 
