@@ -1,15 +1,20 @@
 <div align="center">
-  <img src="public/icon.svg" width="88" alt="Open-Higgsfield logo" />
-  <h1>Open-Higgsfield</h1>
-  <p><strong>The open-source Higgsfield alternative for AI image and video generation.</strong></p>
-  <p>Generate with Freepik, Gemini, Google Vertex AI and Vercel AI Gateway models from one fast, provider-neutral studio.</p>
+  <img src="public/icon.svg" alt="Open-Higgsfield logo" width="112" />
+
+  # Open-Higgsfield
+
+  **The open-source, multi-provider alternative to Higgsfield for AI image and video generation.**
+
+  Generate with Freepik, Gemini, Google Vertex AI, and Vercel AI Gateway models from one focused creative studio.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Live Demo</strong></a>
     |
-    <a href="#quick-start">Quick Start</a>
+    <a href="#why-open-higgsfield">Features</a>
     |
-    <a href="docs/providers.md">Providers</a>
+    <a href="#supported-providers">Providers</a>
+    |
+    <a href="#quick-start">Quick Start</a>
     |
     <a href="CONTRIBUTING.md">Contribute</a>
   </p>
@@ -22,32 +27,35 @@
     <a href="https://github.com/TechBeme/open-higgsfield/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/TechBeme/open-higgsfield?style=social" /></a>
   </p>
 
-  <p><a href="docs/README.pt-BR.md">Leia em Portugues</a></p>
+  **Languages:** 🇺🇸 English · [🇧🇷 Português](README.pt-BR.md) · [🇪🇸 Español](README.es.md)
+
+  <p>
+    <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTechBeme%2Fopen-higgsfield"><img alt="Deploy with Vercel" src="https://vercel.com/button" /></a>
+  </p>
 </div>
 
 ![Open-Higgsfield AI image and video generation studio](docs/images/open-higgsfield-studio.png)
 
-## The open-source Higgsfield alternative
+## Why Open-Higgsfield?
 
-Open-Higgsfield is a free, self-hostable AI image and video studio for people who want a flexible alternative to closed creative platforms. Bring your own API keys, switch providers without changing tools and keep the interface, model catalog and deployment under your control.
+AI media models are spread across providers, dashboards, payload formats, and incompatible controls. Open-Higgsfield brings them into one fast visual workspace:
 
-AI media APIs use different model names, payloads, upload rules, polling formats and output types. Open-Higgsfield puts those differences behind one normalized architecture, so creators get one consistent studio and developers get one extensible codebase.
+- **Generate images and videos in the same studio** without switching products.
+- **Choose from 40 curated models** across Freepik, Google AI Studio, Vertex AI, and Vercel AI Gateway.
+- **Use the right controls for every model** with capability-driven aspect ratios, resolutions, duration, seed, CFG, safety, and audio options.
+- **Work with references naturally** through image-to-image, image-to-video, start/end frames, video, and audio inputs.
+- **Switch providers without relearning the interface** because tasks, progress, errors, and outputs use one consistent workflow.
+- **Bring your own API keys and own the stack** with an MIT-licensed, self-hostable Next.js application.
 
-Open-Higgsfield currently exposes **40 curated image and video models** across four provider integrations without coupling the UI to any provider SDK.
+## Screenshots
 
-> Open-Higgsfield is an independent open-source project and is not affiliated with or endorsed by Higgsfield AI.
+| Model discovery | Adaptive controls |
+| --- | --- |
+| ![Open-Higgsfield model selector](docs/images/open-higgsfield-models.png) | ![Open-Higgsfield advanced generation controls](docs/images/open-higgsfield-controls.png) |
 
-## Highlights
+### Unified generation workspace
 
-- **Images and videos in one studio** - switch modes without leaving the workspace.
-- **Multi-provider by design** - Freepik, Google AI Studio, Vertex AI and Vercel AI Gateway.
-- **40 curated models** - including Gemini, Veo, Flux, Seedream, Kling, Wan, Runway, LTX and more.
-- **Text-to-media and reference workflows** - image-to-image, image-to-video, start/end frames, video and audio inputs.
-- **Capability-driven controls** - the UI only shows settings supported by the selected model.
-- **Provider-neutral tasks** - consistent submission, polling, errors and generated asset handling.
-- **Responsive command bar** - a focused desktop and mobile experience with drag-and-drop media.
-- **Internationalized** - English and Brazilian Portuguese included.
-- **Self-hostable** - run with Node.js or Docker and bring your own API keys.
+![Open-Higgsfield generation workspace](docs/images/open-higgsfield-studio.png)
 
 ## Supported providers
 
@@ -58,47 +66,87 @@ Open-Higgsfield currently exposes **40 curated image and video models** across f
 | Google Vertex AI | 2 | 1 | Google Cloud credentials |
 | Vercel AI Gateway | 5 | 5 | `AI_GATEWAY_API_KEY` |
 
-The model catalog includes Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax and OmniHuman. Availability and pricing are controlled by each upstream provider.
+The catalog includes Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image, and OmniHuman. Model availability, pricing, quotas, and preview access are controlled by each upstream provider.
 
-See the complete integration guide in [docs/providers.md](docs/providers.md).
+See [Providers and models](docs/providers.md) for credentials, provider behavior, and extension instructions.
 
-## Screenshots
+## Features
 
-| Model discovery | Adaptive controls |
-| --- | --- |
-| ![Open-Higgsfield model selector](docs/images/open-higgsfield-models.png) | ![Open-Higgsfield advanced generation controls](docs/images/open-higgsfield-controls.png) |
+- Prompt-to-image and prompt-to-video generation
+- Image-to-image and image-to-video workflows
+- Start frame, end frame, character, motion, video, and audio references
+- Model-aware aspect ratio, size, resolution, duration, seed, CFG, style, and safety controls
+- Native audio and multi-shot options where supported
+- Drag-and-drop, paste, upload, and public URL inputs
+- Normalized synchronous and asynchronous generation tasks
+- Live progress, reusable prompts, previews, and downloads
+- Responsive desktop and mobile command interface
+- Interface in English and Brazilian Portuguese
+- Server-only provider credentials
+- Local Node.js, Docker, and Vercel deployment support
+
+## Tech stack
+
+[![Next.js](https://img.shields.io/badge/Next.js_16-000000?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React_19-20232a?logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06b6d4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?logo=vercel)](https://vercel.com/)
+
+- Next.js App Router and server route handlers
+- React 19, strict TypeScript, Tailwind CSS 4, and Framer Motion
+- Capability-driven model catalog and provider-neutral generation contracts
+- Freepik API, Google Gen AI SDK, Vertex AI, and Vercel AI Gateway
+- Cloudinary handoff for workflows that require public reference-media URLs
+- Local filesystem task storage with replaceable persistence boundaries
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U[Creative workspace] --> C[Model capabilities]
+    C --> A[Generation API]
+    A --> S[Provider-neutral service]
+    S --> R[Provider registry]
+    R --> F[Freepik]
+    R --> G[Google AI Studio]
+    R --> V[Vertex AI]
+    R --> W[Vercel AI Gateway]
+    F --> T[Normalized tasks and assets]
+    G --> T
+    V --> T
+    W --> T
+    T --> U
+```
+
+The UI reads model capabilities instead of provider-specific rules. The backend converts every request into canonical generation parameters, resolves the provider adapter, and normalizes synchronous results or asynchronous operations into the same task format.
+
+See [Architecture](docs/architecture.md) for the complete request lifecycle and extension points.
 
 ## Quick start
 
-### Requirements
+### Prerequisites
 
 - Node.js 22+
 - npm 10+
-- At least one provider API key
-- Cloudinary credentials for workflows that upload reference media
+- At least one supported provider credential
+- Cloudinary credentials only when a workflow requires public reference-media URLs
 
-### Run locally
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/TechBeme/open-higgsfield.git
 cd open-higgsfield
 npm install
-cp .env.example .env.local
-npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Configure only the provider you want to use.
-
-### Run with Docker
+### 2. Configure the environment
 
 ```bash
 cp .env.example .env.local
-docker compose up --build
 ```
 
-Generated files and local task history are stored in the `open-higgsfield-data` Docker volume.
-
-## Configuration
+Configure only the providers you want to use:
 
 ```dotenv
 # Freepik
@@ -115,87 +163,93 @@ GOOGLE_SERVICE_ACCOUNT_JSON=
 # Vercel AI Gateway
 AI_GATEWAY_API_KEY=
 
-# Reference media uploads
+# Reference-media uploads
 CLOUDINARY_URL=
 ```
 
-Never prefix provider secrets with `NEXT_PUBLIC_`. Open-Higgsfield reads credentials only in server-side modules. See [.env.example](.env.example) for every supported variable.
+Never use `NEXT_PUBLIC_` for provider credentials. Open-Higgsfield reads them only from server-side modules.
 
-## How it works
+### 3. Start Open-Higgsfield
 
-```mermaid
-flowchart LR
-    UI[Capability-driven UI] --> API[Generation routes]
-    API --> SERVICE[Provider-neutral generation service]
-    SERVICE --> REGISTRY[Provider registry]
-    REGISTRY --> FREEPIK[Freepik adapter]
-    REGISTRY --> GOOGLE[Google AI Studio / Vertex]
-    REGISTRY --> GATEWAY[Vercel AI Gateway]
-    FREEPIK --> TASKS[Normalized tasks and assets]
-    GOOGLE --> TASKS
-    GATEWAY --> TASKS
+```bash
+npm run dev
 ```
 
-The frontend reads model capabilities from `src/models/capabilities`. The backend resolves the selected provider through `src/providers/registry.ts`. Every provider implements the same submission and polling contract from `src/providers/types.ts`.
+Open [http://localhost:3000](http://localhost:3000) and start generating.
 
-This separation lets you add a provider without rewriting the command bar, task feed or persistence format.
+### Docker
 
-- [Architecture overview](docs/architecture.md)
-- [Add or configure providers](docs/providers.md)
-- [Deployment guide](docs/deployment.md)
+```bash
+cp .env.example .env.local
+docker compose up --build
+```
 
-## Add a provider
+Docker stores generated files and task history in the `open-higgsfield-data` volume.
 
-1. Add a provider ID and implement `GenerationProvider` in `src/providers/`.
-2. Register the implementation in `src/providers/registry.ts`.
-3. Describe each model in `src/models/capabilities/`.
-4. Add documented environment variables to `.env.example`.
+## Deploy on Vercel
 
-The UI automatically derives model groups, media slots and controls from capabilities.
+Use the **Deploy with Vercel** button at the top, then add credentials only for the providers you want enabled. Attach a custom domain after the first successful deployment.
 
-## Deploy
+Vercel uses ephemeral `/tmp` storage. The interface and generation routes work normally, but durable task history and generated files require shared object storage and a persistent task backend. Docker remains the simplest full-state self-hosted deployment.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTechBeme%2Fopen-higgsfield)
+> [!WARNING]
+> Open-Higgsfield does not currently include built-in authentication, rate limiting, or per-user spending limits. Protect public deployments connected to billable provider accounts.
 
-Open-Higgsfield can be deployed to Vercel for a public interface, but local files and in-memory tasks are ephemeral on serverless platforms. For reliable production generation, connect durable object storage and a persistent task/queue backend. The Docker deployment keeps local state on a volume and is the simplest full-featured self-hosted option today.
+See [Deployment](docs/deployment.md) for production and persistence guidance.
 
-Read [docs/deployment.md](docs/deployment.md) before exposing a deployment that uses paid provider credentials.
+## Commands
 
-## Security
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Run TypeScript checks |
+| `npm run build` | Create a production build |
+| `npm run check` | Run lint, typecheck, and build |
+| `npm start` | Serve the production build |
 
-- Secrets stay server-side and all local environment files are ignored.
-- User-supplied remote media URLs are validated to block private-network access.
-- Generation payloads, prompts and file names are not written to debug logs.
-- Public deployments should add authentication, rate limits and provider spend limits.
+## Documentation
 
-Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
-
-## Project status and roadmap
-
-Open-Higgsfield is actively evolving. The provider abstraction and generation studio are usable now; production infrastructure depends on the deployment target.
-
-- [x] Multi-provider image and video generation
-- [x] Capability-driven model controls
-- [x] Provider-neutral async polling
-- [x] Responsive UI and i18n
-- [x] Docker deployment
-- [ ] Durable storage adapters for serverless deployments
-- [ ] Authentication and configurable rate limiting
-- [ ] Provider health and cost visibility
-- [ ] Community model presets
+- [Providers and models](docs/providers.md): credentials, supported integrations, and adding providers
+- [Architecture](docs/architecture.md): capability system, provider registry, tasks, and storage
+- [Deployment](docs/deployment.md): Vercel, Docker, Node.js, security, and persistence
+- [Contributing](CONTRIBUTING.md): development workflow and pull requests
+- [Security policy](SECURITY.md): responsible vulnerability reporting
 
 ## Contributing
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), browse [good first issues](https://github.com/TechBeme/open-higgsfield/labels/good%20first%20issue), or open a discussion with a provider/model proposal.
+Contributions are welcome, from new providers and model families to accessibility, translations, tests, and creative tooling.
 
-If Open-Higgsfield is useful to you, **star the repository**. Stars help more builders discover the project and directly influence what gets prioritized next.
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+2. Fork the repository and create a focused branch.
+3. Run `npm run check`.
+4. Open a pull request using the provided template.
+
+If Open-Higgsfield is useful to you, **star the repository**, share it with another creator, and show us what you build.
+
+## Security
+
+Do not report vulnerabilities in public issues. Follow [SECURITY.md](SECURITY.md) and never include provider credentials, private generated media, or personal data in reports.
+
+## Disclaimer
+
+Open-Higgsfield is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Higgsfield AI, Freepik, Google, Vercel, or any model provider. Product and model names belong to their respective owners. Availability, pricing, quotas, APIs, and capabilities may change upstream.
+
+You are responsible for provider costs, generated content, deployment security, and compliance with provider terms and applicable law.
 
 ## License
 
-Open-Higgsfield is released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).
 
 ---
 
 <div align="center">
-  Built by <a href="https://techbe.me">TechBe</a> for creators and open-source AI builders.
+
+**Developed by [Rafael Vieira](https://github.com/TechBeme)**
+
+[![GitHub](https://img.shields.io/badge/GitHub-TechBeme-181717?logo=github)](https://github.com/TechBeme)
+[![Fiverr](https://img.shields.io/badge/Fiverr-Tech__Be-1DBF73?logo=fiverr)](https://www.fiverr.com/tech_be)
+[![Upwork](https://img.shields.io/badge/Upwork-Profile-14a800?logo=upwork)](https://www.upwork.com/freelancers/~01f0abcf70bbd95376)
+[![Email](https://img.shields.io/badge/Email-contact@techbe.me-EA4335?logo=gmail)](mailto:contact@techbe.me)
+
 </div>
