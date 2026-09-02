@@ -154,7 +154,7 @@ docker compose up --build
 
 ## Despliegue en Vercel
 
-Usa el botón **Deploy with Vercel** de la parte superior y añade únicamente las credenciales de los proveedores que quieras habilitar. Vercel utiliza almacenamiento efímero en `/tmp`; el historial y los archivos duraderos requieren object storage y un backend persistente. Consulta [Despliegue](docs/deployment.md).
+Usa el botón **Deploy with Vercel** de la parte superior y añade únicamente las credenciales de los proveedores que quieras habilitar. Configura `DATABASE_URL` para conservar el historial y las imágenes generadas en PostgreSQL/Neon. Las cargas temporales, los videos y los workers asíncronos todavía requieren object storage y colas duraderas. Consulta [Despliegue](docs/deployment.md).
 
 > [!WARNING]
 > Open-Higgsfield no incluye autenticación, rate limiting ni límites de gasto por usuario. Protege los despliegues públicos conectados a cuentas facturables.

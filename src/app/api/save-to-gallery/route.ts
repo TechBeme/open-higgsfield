@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTask } from "@/lib/task-store";
+import { getTask, initStore } from "@/lib/task-store";
 import { downloadUrl } from "@/lib/upload";
 
 export async function POST(req: NextRequest) {
+    await initStore();
     const body = await req.json() as { task_id?: string; image_index?: number };
     const { task_id, image_index } = body;
 

@@ -17,11 +17,12 @@ Do not expose provider keys through `NEXT_PUBLIC_*` variables.
 
 1. Import the GitHub repository into Vercel.
 2. Add only the credentials for the providers you want enabled.
-3. Add Cloudinary credentials for reference media workflows.
-4. Point `openhiggs.techbe.me` to the deployment.
-5. Enable deployment protection while validating real provider calls.
+3. Add `DATABASE_URL` for persistent task history and generated images.
+4. Add Cloudinary credentials for reference media workflows.
+5. Point `openhiggs.techbe.me` to the deployment.
+6. Enable deployment protection while validating real provider calls.
 
-Vercel functions use `/tmp/open-higgsfield` automatically. That filesystem and in-memory task state are ephemeral. The UI deploys normally, but reliable asynchronous generation needs durable task storage and a queue/worker or scheduled polling strategy.
+With `DATABASE_URL`, completed image tasks survive Vercel cold starts and deployments. Vercel functions still use ephemeral `/tmp/open-higgsfield` for temporary uploads and generated videos. Reliable asynchronous generation also needs a durable queue/worker or scheduled polling strategy.
 
 ## Docker
 
@@ -46,9 +47,9 @@ Ensure the process user can write to `OPEN_HIGGSFIELD_STORAGE_DIR`. Put a TLS re
 
 ## Production persistence
 
-The current persistence modules are intentionally small and easy to replace:
+The persistence modules are intentionally small and easy to replace:
 
-- `src/lib/task-store.ts` for task state;
+- `src/lib/database.ts` and `src/lib/task-store.ts` for PostgreSQL-backed task state;
 - `src/lib/upload.ts` for inputs and generated files;
 - `src/lib/poller.ts` for asynchronous provider operations.
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTask, deleteTask } from "@/lib/task-store";
+import { getTask, deleteTask, initStore } from "@/lib/task-store";
 
 export const runtime = "nodejs";
 
@@ -8,9 +8,10 @@ export async function DELETE(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   const { taskId } = await params;
+  await initStore();
   if (!getTask(taskId)) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
-  deleteTask(taskId);
+  await deleteTask(taskId);
   return NextResponse.json({ ok: true });
 }

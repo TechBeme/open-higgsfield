@@ -1,6 +1,7 @@
 import type { AnyTask, ImageTask, VideoTask } from "@/types";
 import type { GeneratedAsset } from "@/providers/types";
 import { saveDownload } from "@/lib/upload";
+import { isDatabaseConfigured } from "@/lib/database";
 
 function extensionFor(mimeType?: string, url?: string): string {
     const mime = mimeType?.toLowerCase() ?? "";
@@ -33,13 +34,20 @@ export async function attachGeneratedAssets(task: AnyTask, assets: GeneratedAsse
     if (task.media_type === "image") {
         const imageTask = task as ImageTask;
         const paths: string[] = [];
+        const urls: string[] = [];
         for (const [index, asset] of assets.entries()) {
             const materialized = await materializeAsset(asset);
             const ext = extensionFor(materialized.mimeType, materialized.sourceUrl);
             paths.push(await saveDownload(task.task_id, `_${index}${ext}`, materialized.data));
+            if (isDatabaseConfigured()) {
+                const mimeType = materialized.mimeType ?? (ext === ".jpg" ? "image/jpeg" : `image/${ext.slice(1)}`);
+                urls.push(`data:${mimeType};base64,${materialized.data.toString("base64")}`);
+            }
         }
         imageTask.result_paths = paths;
-        imageTask.result_urls = paths.map((_, index) => `/api/download/${task.task_id}?index=${index}`);
+        imageTask.result_urls = urls.length > 0
+            ? urls
+            : paths.map((_, index) => `/api/download/${task.task_id}?index=${index}`);
         return;
     }
 

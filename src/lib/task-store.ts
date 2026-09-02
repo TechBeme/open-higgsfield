@@ -3,6 +3,7 @@ import path from "path";
 import type { AnyTask, VideoTask, ImageTask } from "@/types";
 import { resumePendingTasks } from "@/lib/poller";
 import { STORAGE_ROOT } from "@/lib/storage-paths";
+import { deletePersistedTask, loadPersistedTasks, persistTasks } from "@/lib/database";
 
 const TASKS_FILE = path.join(STORAGE_ROOT, "tasks_history.json");
 
@@ -31,8 +32,8 @@ function buildLocalImageUrls(taskId: string, resultPaths?: string[]): string[] {
     return resultPaths.map((_, i) => `/api/download/${taskId}?index=${i}`);
 }
 
-export async function saveTasks(): Promise<void> {
-    const snapshot = [...memStore.values()].map((t) => {
+function buildSnapshot(): AnyTask[] {
+    return [...memStore.values()].map((t) => {
         const out: Record<string, unknown> = {};
         for (const k of SAVE_FIELDS) {
             if (k in t) out[k] = (t as unknown as Record<string, unknown>)[k];
@@ -40,8 +41,9 @@ export async function saveTasks(): Promise<void> {
 
         if (t.media_type === "image") {
             const imageTask = t as ImageTask;
-            // Persist local URLs so history does not depend on expiring CDN links.
-            out.result_urls = buildLocalImageUrls(t.task_id, imageTask.result_paths);
+            out.result_urls = imageTask.result_urls?.length
+                ? imageTask.result_urls
+                : buildLocalImageUrls(t.task_id, imageTask.result_paths);
         }
 
         if (t.media_type === "video") {
@@ -50,8 +52,11 @@ export async function saveTasks(): Promise<void> {
                 if (k in v) out[k] = (v as unknown as Record<string, unknown>)[k];
             }
         }
-        return out;
+        return out as unknown as AnyTask;
     });
+}
+
+async function saveTasksToFile(snapshot: AnyTask[]): Promise<void> {
 
     const tmp = TASKS_FILE + ".tmp";
     try {
@@ -65,37 +70,61 @@ export async function saveTasks(): Promise<void> {
     }
 }
 
+export async function saveTasks(): Promise<void> {
+    const snapshot = buildSnapshot();
+    const results = await Promise.allSettled([
+        saveTasksToFile(snapshot),
+        persistTasks(snapshot),
+    ]);
+    for (const result of results) {
+        if (result.status === "rejected") {
+            console.error("[task-store] persistence error:", result.reason);
+        }
+    }
+}
+
+function hydrateTask(row: AnyTask) {
+    const tid = row.task_id;
+    if (!tid) return;
+
+    if (row.media_type === "image" && (!row.result_urls || row.result_urls.length === 0)) {
+        row.result_urls = buildLocalImageUrls(tid, row.result_paths);
+    }
+
+    const status = row.status ?? row.freepik_status ?? "";
+    row.status = status;
+    const isDone = ["COMPLETED", "FAILED", "ERROR", "CANCELLED"].includes(status);
+    const events: NonNullable<AnyTask["events"]> = [];
+
+    if (status === "COMPLETED") {
+        if (row.media_type === "image") {
+            events.push({ type: "completed", media_type: "image", result_urls: row.result_urls ?? [], has_download: !!(row.result_paths?.length || row.result_urls?.length) });
+        } else {
+            const vt = row as VideoTask;
+            events.push({ type: "completed", video_urls: vt.video_urls ?? [], has_download: !!vt.video_path });
+        }
+    } else if (["FAILED", "ERROR", "CANCELLED"].includes(status)) {
+        events.push({ type: "failed", status, message: row.error_message });
+    }
+
+    memStore.set(tid, { ...row, events, _done: isDone });
+}
+
 export async function loadTasks(): Promise<Map<string, AnyTask & { events: NonNullable<AnyTask["events"]>; _done: boolean }>> {
+    try {
+        const persisted = await loadPersistedTasks();
+        if (persisted.length > 0) {
+            for (const row of persisted) hydrateTask(row);
+            return memStore;
+        }
+    } catch (error) {
+        console.error("[task-store] database load error:", error);
+    }
+
     try {
         const raw = await fs.readFile(TASKS_FILE, "utf-8");
         const rows: AnyTask[] = JSON.parse(raw);
-        for (const row of rows) {
-            const tid = row.task_id;
-            if (!tid) continue;
-
-            // Migrate historical image rows to local persisted URLs.
-            if (row.media_type === "image") {
-                row.result_urls = buildLocalImageUrls(tid, row.result_paths);
-            }
-
-            const status = row.status ?? row.freepik_status ?? "";
-            row.status = status;
-            const isDone = ["COMPLETED", "FAILED", "ERROR", "CANCELLED"].includes(status);
-            const events: NonNullable<AnyTask["events"]> = [];
-
-            if (status === "COMPLETED") {
-                if (row.media_type === "image") {
-                    events.push({ type: "completed", media_type: "image", result_urls: row.result_urls ?? [], has_download: !!(row.result_paths?.length) });
-                } else {
-                    const vt = row as VideoTask;
-                    events.push({ type: "completed", video_urls: vt.video_urls ?? [], has_download: !!vt.video_path });
-                }
-            } else if (["FAILED", "ERROR", "CANCELLED"].includes(status)) {
-                events.push({ type: "failed", status, message: row.error_message });
-            }
-
-            memStore.set(tid, { ...row, events, _done: isDone });
-        }
+        for (const row of rows) hydrateTask(row);
     } catch {
         // File doesn't exist yet — start fresh
     }
@@ -114,8 +143,12 @@ export function setTask(task: AnyTask & { events: NonNullable<AnyTask["events"]>
     memStore.set(task.task_id, task);
 }
 
-export function deleteTask(taskId: string) {
+export async function deleteTask(taskId: string) {
     memStore.delete(taskId);
+    await Promise.all([
+        deletePersistedTask(taskId),
+        saveTasksToFile(buildSnapshot()),
+    ]);
 }
 
 export function pushEvent(taskId: string, event: NonNullable<AnyTask["events"]>[number]) {
@@ -142,7 +175,9 @@ export function getImageTasks(): ImageTask[] {
             const imageTask = t as ImageTask;
             return {
                 ...imageTask,
-                result_urls: buildLocalImageUrls(imageTask.task_id, imageTask.result_paths),
+                result_urls: imageTask.result_urls?.length
+                    ? imageTask.result_urls
+                    : buildLocalImageUrls(imageTask.task_id, imageTask.result_paths),
             };
         })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) as ImageTask[];

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTask } from "@/lib/task-store";
+import { getTask, initStore } from "@/lib/task-store";
 import path from "path";
 import fs from "fs";
 import mime from "mime-types";
@@ -9,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   const { taskId } = await params;
+  await initStore();
   const task = getTask(taskId);
 
   if (!task) {
@@ -17,28 +18,45 @@ export async function GET(
 
   const isImage = task.media_type === "image";
   const paths: string[] = ((task as unknown as Record<string, unknown>).result_paths as string[] | undefined) ?? [];
+  const urls: string[] = ((task as unknown as Record<string, unknown>).result_urls as string[] | undefined) ?? [];
+
+  const dataUrlResponse = (value: string, attachment: boolean) => {
+    const match = value.match(/^data:([^;,]+);base64,([\s\S]+)$/);
+    if (!match) return null;
+    const mimeType = match[1];
+    const buf = Buffer.from(match[2], "base64");
+    const extension = mime.extension(mimeType) || "bin";
+    return new NextResponse(buf, {
+      headers: {
+        "Content-Type": mimeType,
+        "Content-Disposition": `${attachment ? "attachment" : "inline"}; filename="${taskId}.${extension}"`,
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+    });
+  };
 
   if (isImage) {
     const indexParam = req.nextUrl.searchParams.get("index");
     if (indexParam !== null) {
       const idx = Number(indexParam);
-      if (!Number.isInteger(idx) || idx < 0 || idx >= paths.length) {
+      if (!Number.isInteger(idx) || idx < 0 || idx >= Math.max(paths.length, urls.length)) {
         return NextResponse.json({ error: "Invalid image index" }, { status: 400 });
       }
       const imagePath = paths[idx];
-      if (!fs.existsSync(imagePath)) {
-        return NextResponse.json({ error: "File not found" }, { status: 404 });
+      if (imagePath && fs.existsSync(imagePath)) {
+        const buf = fs.readFileSync(imagePath);
+        const mimeType = mime.lookup(imagePath) || "image/png";
+        const filename = path.basename(imagePath);
+        return new NextResponse(buf, {
+          headers: {
+            "Content-Type": mimeType,
+            "Content-Disposition": `inline; filename="${filename}"`,
+            "Cache-Control": "public, max-age=31536000, immutable",
+          },
+        });
       }
-      const buf = fs.readFileSync(imagePath);
-      const mimeType = mime.lookup(imagePath) || "image/png";
-      const filename = path.basename(imagePath);
-      return new NextResponse(buf, {
-        headers: {
-          "Content-Type": mimeType,
-          "Content-Disposition": `inline; filename="${filename}"`,
-          "Cache-Control": "public, max-age=31536000, immutable",
-        },
-      });
+      return dataUrlResponse(urls[idx] ?? "", false)
+        ?? NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
     // If multiple images → zip, if single → direct download
@@ -55,6 +73,10 @@ export async function GET(
           "Content-Disposition": `attachment; filename="${filename}"`,
         },
       });
+    }
+    if (paths.length === 0 && urls.length === 1) {
+      return dataUrlResponse(urls[0], true)
+        ?? NextResponse.json({ error: "File not found" }, { status: 404 });
     }
     if (paths.length > 1) {
       // Return JSON list of download URLs for multi-image

@@ -98,7 +98,7 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - Capability-driven model catalog and provider-neutral generation contracts
 - Freepik API, Google Gen AI SDK, Vertex AI, and Vercel AI Gateway
 - Cloudinary handoff for workflows that require public reference-media URLs
-- Local filesystem task storage with replaceable persistence boundaries
+- PostgreSQL/Neon image history with a local filesystem fallback
 
 ## Architecture
 
@@ -190,7 +190,7 @@ Docker stores generated files and task history in the `open-higgsfield-data` vol
 
 Use the **Deploy with Vercel** button at the top, then add credentials only for the providers you want enabled. Attach a custom domain after the first successful deployment.
 
-Vercel uses ephemeral `/tmp` storage. The interface and generation routes work normally, but durable task history and generated files require shared object storage and a persistent task backend. Docker remains the simplest full-state self-hosted deployment.
+Add `DATABASE_URL` to persist task history and generated images in PostgreSQL/Neon across Vercel cold starts and deployments. Temporary uploads, generated videos, and asynchronous workers still require durable object storage and queue infrastructure for full production resilience.
 
 > [!WARNING]
 > Open-Higgsfield does not currently include built-in authentication, rate limiting, or per-user spending limits. Protect public deployments connected to billable provider accounts.

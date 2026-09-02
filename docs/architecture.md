@@ -43,7 +43,7 @@ Freepik has model-family-specific payload and endpoint differences. Those remain
 
 ## Storage
 
-Local development stores task history, uploads and downloads on disk. `OPEN_HIGGSFIELD_STORAGE_DIR` changes the storage root. Vercel defaults to `/tmp/open-higgsfield`, which is ephemeral and should not be considered durable production storage.
+When `DATABASE_URL` is configured, task history and generated images are persisted in PostgreSQL/Neon. Local development falls back to disk, and `OPEN_HIGGSFIELD_STORAGE_DIR` changes that storage root. Temporary uploads and generated videos still use the filesystem; Vercel defaults to ephemeral `/tmp/open-higgsfield` for those files.
 
 ## Extension points
 

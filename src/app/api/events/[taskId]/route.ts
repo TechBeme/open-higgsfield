@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getTask } from "@/lib/task-store";
+import { getTask, initStore } from "@/lib/task-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   const { taskId } = await params;
+  await initStore();
   const task = getTask(taskId);
 
   if (!task) {
