@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a feature, provider or model
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What workflow would this improve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain the desired behavior and user experience.
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider or model
+      placeholder: Optional - provider name and official model ID
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Official documentation
+      description: Link official API documentation when requesting an integration.
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to help implement this.

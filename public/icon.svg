@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Flow logo">
+  <rect width="64" height="64" rx="18" fill="#0a0a0a"/>
+  <path d="M15 18h34v9H25v7h20v9H25v12H15z" fill="#d5ff47"/>
+  <circle cx="49" cy="50" r="6" fill="#f4f7fb"/>
+</svg>

@@ -1,0 +1,171 @@
+{
+    "common": {
+        "appName": "Flow",
+        "generate": "Generate",
+        "video": "Video",
+        "image": "Image",
+        "generating": "Generating...",
+        "download": "Download",
+        "delete": "Delete",
+        "reuse": "Reuse",
+        "cancel": "Cancel",
+        "close": "Close",
+        "error": "Error",
+        "loading": "Loading...",
+        "noResults": "No results",
+        "seeMore": "See more",
+        "seeLess": "See less",
+        "copy": "Copy",
+        "copied": "Copied!",
+        "confirm": "Confirm",
+        "optional": "Optional",
+        "required": "Required",
+        "referenceVideo": "Reference video",
+        "audio": "Audio"
+    },
+    "nav": {
+        "video": "Video",
+        "image": "Image",
+        "apiKey": "API Key",
+        "lightMode": "Light mode",
+        "darkMode": "Dark mode"
+    },
+    "studio": {
+        "video": {
+            "title": "Video Studio",
+            "subtitle": "Generate AI videos",
+            "selectProvider": "Choose provider",
+            "selectModel": "Choose model",
+            "selectVariant": "Choose variant",
+            "prompt": {
+                "label": "Prompt",
+                "placeholder": "Describe the video you want to generate...",
+                "hint": "Shift+Enter to generate • File paste supported",
+                "counter": "{count}/{max} characters"
+            },
+            "negativePrompt": {
+                "label": "Negative prompt",
+                "placeholder": "What to avoid in the video..."
+            },
+            "duration": "Duration",
+            "aspectRatio": "Aspect ratio",
+            "size": "Size",
+            "cfgScale": "CFG Scale",
+            "shotType": "Shot type",
+            "shotTypes": {
+                "single": "Single shot",
+                "multi": "Multi-shot"
+            },
+            "style": "Style",
+            "styles": {
+                "none": "None",
+                "anime": "Anime",
+                "3d": "3D",
+                "clay": "Clay",
+                "cyberpunk": "Cyberpunk",
+                "comic": "Comic"
+            },
+            "expandPrompt": "Expand prompt with AI",
+            "seed": "Seed",
+            "seedHint": "-1 = random",
+            "v2vBanner": "Add a reference video to use Video-to-Video (V2V) mode",
+            "attachments": "Images & videos",
+            "uploadFile": "Upload file",
+            "orUrl": "or public URL",
+            "urlPlaceholder": "https://...",
+            "dragHint": "Drag or click to upload",
+            "advanced": "Advanced settings",
+            "generateButton": "Generate Video",
+            "generating": "Generating...",
+            "promptPlaceholder": "Describe the video you want to generate..."
+        },
+        "image": {
+            "title": "Image Studio",
+            "subtitle": "Generate AI images",
+            "selectGroup": "Choose group",
+            "selectModel": "Choose model",
+            "prompt": {
+                "label": "Prompt",
+                "placeholder": "Describe the image you want to generate...",
+                "hint": "Shift+Enter to generate"
+            },
+            "slots": "Reference images",
+            "upload": "Upload",
+            "urlInput": "URL",
+            "generateButton": "Generate Image",
+            "generating": "Generating...",
+            "promptPlaceholder": "Describe the image you want to generate...",
+            "enhancePrompt": "Enhance prompt",
+            "safety": "Safety",
+            "size": "Size",
+            "aspectRatio": "Aspect ratio",
+            "resolution": "Resolution",
+            "options": "Options"
+        }
+    },
+    "tasks": {
+        "feedTitle": "Generations",
+        "taskCount": "tasks",
+        "empty": "No generations yet. Configure a model and write a prompt to get started.",
+        "seeMore": "See more",
+        "seeLess": "See less",
+        "status": {
+            "CREATED": "Created",
+            "IN_PROGRESS": "Processing",
+            "COMPLETED": "Completed",
+            "FAILED": "Failed",
+            "ERROR": "Error",
+            "CANCELLED": "Cancelled"
+        },
+        "elapsed": "{seconds}s",
+        "model": "Model",
+        "taskId": "Task ID",
+        "downloadVideo": "Download video",
+        "downloadImage": "Download image",
+        "downloadAll": "Download all",
+        "imageCount": "{count} images",
+        "reuse": "Reuse"
+    },
+    "errors": {
+        "ERR_NO_API_KEY": "API key not configured. Set FREEPIK_API_KEY in .env.local",
+        "ERR_GEMINI_API_KEY_NOT_CONFIGURED": "Set GEMINI_API_KEY to use Google AI Studio",
+        "ERR_GOOGLE_CLOUD_PROJECT_NOT_CONFIGURED": "Set GOOGLE_CLOUD_PROJECT to use Vertex AI",
+        "ERR_INVALID_GOOGLE_SERVICE_ACCOUNT_JSON": "The Google Cloud JSON credentials are invalid",
+        "ERR_AI_GATEWAY_API_KEY_NOT_CONFIGURED": "Set AI_GATEWAY_API_KEY to use Vercel AI Gateway",
+        "ERR_NO_IMAGE_GENERATED": "The provider did not return an image",
+        "ERR_NO_VIDEO_GENERATED": "The provider did not return a video",
+        "ERR_UNKNOWN_MODEL": "Unknown model",
+        "ERR_PROMPT_REQUIRED": "Prompt is required for this model",
+        "ERR_PROMPT_TOO_LONG": "Prompt exceeds model limit ({max} characters)",
+        "ERR_MISSING_ATTACHMENT": "Missing required attachment: {label}",
+        "ERR_ATTACHMENT_GROUP_MIN": "Provide at least {min} attachment(s) for {label}",
+        "ERR_ATTACHMENT_GROUP_MAX": "Provide at most {max} attachment(s) for {label}",
+        "ERR_NO_VIDEO": "Please provide a reference video",
+        "ERR_FREEPIK_API": "Freepik API error. Please try again.",
+        "ERR_FREEPIK_TRIAL_LIMIT": "Your Freepik API free trial has ended. Please upgrade your plan to continue generating.",
+        "ERR_TMPFILES_UPLOAD": "Temporary file upload error",
+        "ERR_DOWNLOAD_FAILED": "Error downloading result",
+        "ERR_INVALID_STATUS": "Invalid API response",
+        "ERR_UPLOAD": "Error uploading file",
+        "ERR_GENERIC": "An unexpected error occurred"
+    },
+    "validation": {
+        "promptRequired": "Prompt is required",
+        "promptTooLong": "Prompt must be at most {max} characters",
+        "modelRequired": "Please select a model"
+    },
+    "commandBar": {
+        "attachmentsTitle": "Attachments",
+        "imageAttachmentsTitle": "Guide Images",
+        "noAttachmentSlots": "No attachment slots for this model",
+        "upload": "Upload",
+        "url": "URL",
+        "add": "Add",
+        "required": "Required",
+        "optional": "Optional",
+        "imageLabel": "Image",
+        "urlPlaceholder": "https://...",
+        "dropSingleTitle": "Drop {field}",
+        "dropSingleHint": "Drag files here to attach to this field"
+    }
+}

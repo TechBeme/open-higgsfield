@@ -1,0 +1,171 @@
+{
+    "common": {
+        "appName": "Flow",
+        "generate": "Gerar",
+        "video": "Vídeo",
+        "image": "Imagem",
+        "generating": "Gerando...",
+        "download": "Download",
+        "delete": "Excluir",
+        "reuse": "Reutilizar",
+        "cancel": "Cancelar",
+        "close": "Fechar",
+        "error": "Erro",
+        "loading": "Carregando...",
+        "noResults": "Sem resultados",
+        "seeMore": "Ver mais",
+        "seeLess": "Ver menos",
+        "copy": "Copiar",
+        "copied": "Copiado!",
+        "confirm": "Confirmar",
+        "optional": "Opcional",
+        "required": "Obrigatório",
+        "referenceVideo": "Vídeo de referência",
+        "audio": "Áudio"
+    },
+    "nav": {
+        "video": "Vídeo",
+        "image": "Imagem",
+        "apiKey": "API Key",
+        "lightMode": "Modo claro",
+        "darkMode": "Modo escuro"
+    },
+    "studio": {
+        "video": {
+            "title": "Studio de Vídeo",
+            "subtitle": "Gere vídeos com IA",
+            "selectProvider": "Escolha o provedor",
+            "selectModel": "Escolha o modelo",
+            "selectVariant": "Escolha a variante",
+            "prompt": {
+                "label": "Prompt",
+                "placeholder": "Descreva o vídeo que deseja gerar...",
+                "hint": "Shift+Enter para gerar • Paste de arquivos suportado",
+                "counter": "{count}/{max} caracteres"
+            },
+            "negativePrompt": {
+                "label": "Prompt negativo",
+                "placeholder": "O que evitar no vídeo..."
+            },
+            "duration": "Duração",
+            "aspectRatio": "Proporção",
+            "size": "Tamanho",
+            "cfgScale": "CFG Scale",
+            "shotType": "Tipo de cena",
+            "shotTypes": {
+                "single": "Cena única",
+                "multi": "Multi-cena"
+            },
+            "style": "Estilo",
+            "styles": {
+                "none": "Nenhum",
+                "anime": "Anime",
+                "3d": "3D",
+                "clay": "Clay",
+                "cyberpunk": "Cyberpunk",
+                "comic": "Comic"
+            },
+            "expandPrompt": "Expandir prompt com IA",
+            "seed": "Seed",
+            "seedHint": "-1 = aleatório",
+            "v2vBanner": "Adicione um vídeo de referência para usar o modo Vídeo-para-Vídeo (V2V)",
+            "attachments": "Imagens e vídeos",
+            "uploadFile": "Enviar arquivo",
+            "orUrl": "ou URL pública",
+            "urlPlaceholder": "https://...",
+            "dragHint": "Arraste ou clique para enviar",
+            "advanced": "Configurações avançadas",
+            "generateButton": "Gerar Vídeo",
+            "generating": "Gerando...",
+            "promptPlaceholder": "Descreva o vídeo que deseja gerar..."
+        },
+        "image": {
+            "title": "Studio de Imagem",
+            "subtitle": "Gere imagens com IA",
+            "selectGroup": "Escolha o grupo",
+            "selectModel": "Escolha o modelo",
+            "prompt": {
+                "label": "Prompt",
+                "placeholder": "Descreva a imagem que deseja gerar...",
+                "hint": "Shift+Enter para gerar"
+            },
+            "slots": "Imagens de referência",
+            "upload": "Enviar",
+            "urlInput": "URL",
+            "generateButton": "Gerar Imagem",
+            "generating": "Gerando...",
+            "promptPlaceholder": "Descreva a imagem que deseja gerar...",
+            "enhancePrompt": "Melhorar prompt",
+            "safety": "Segurança",
+            "size": "Tamanho",
+            "aspectRatio": "Proporção",
+            "resolution": "Resolução",
+            "options": "Opções"
+        }
+    },
+    "tasks": {
+        "feedTitle": "Gerações",
+        "taskCount": "tarefas",
+        "empty": "Nenhuma geração ainda. Configure um modelo e escreva um prompt para começar.",
+        "seeMore": "Ver mais",
+        "seeLess": "Ver menos",
+        "status": {
+            "CREATED": "Criada",
+            "IN_PROGRESS": "Processando",
+            "COMPLETED": "Concluído",
+            "FAILED": "Falhou",
+            "ERROR": "Erro",
+            "CANCELLED": "Cancelada"
+        },
+        "elapsed": "{seconds}s",
+        "model": "Modelo",
+        "taskId": "ID da tarefa",
+        "downloadVideo": "Baixar vídeo",
+        "downloadImage": "Baixar imagem",
+        "downloadAll": "Baixar tudo",
+        "imageCount": "{count} imagens",
+        "reuse": "Reutilizar"
+    },
+    "errors": {
+        "ERR_NO_API_KEY": "Chave de API não configurada. Defina FREEPIK_API_KEY no arquivo .env.local",
+        "ERR_GEMINI_API_KEY_NOT_CONFIGURED": "Defina GEMINI_API_KEY para usar o Google AI Studio",
+        "ERR_GOOGLE_CLOUD_PROJECT_NOT_CONFIGURED": "Defina GOOGLE_CLOUD_PROJECT para usar o Vertex AI",
+        "ERR_INVALID_GOOGLE_SERVICE_ACCOUNT_JSON": "As credenciais JSON do Google Cloud são inválidas",
+        "ERR_AI_GATEWAY_API_KEY_NOT_CONFIGURED": "Defina AI_GATEWAY_API_KEY para usar o Vercel AI Gateway",
+        "ERR_NO_IMAGE_GENERATED": "O provedor não retornou nenhuma imagem",
+        "ERR_NO_VIDEO_GENERATED": "O provedor não retornou nenhum vídeo",
+        "ERR_UNKNOWN_MODEL": "Modelo desconhecido",
+        "ERR_PROMPT_REQUIRED": "O prompt é obrigatório para este modelo",
+        "ERR_PROMPT_TOO_LONG": "O prompt excede o limite do modelo ({max} caracteres)",
+        "ERR_MISSING_ATTACHMENT": "Falta o anexo obrigatório: {label}",
+        "ERR_ATTACHMENT_GROUP_MIN": "Forneça ao menos {min} anexo(s) para {label}",
+        "ERR_ATTACHMENT_GROUP_MAX": "Forneça no máximo {max} anexo(s) para {label}",
+        "ERR_NO_VIDEO": "Forneça um vídeo de referência",
+        "ERR_FREEPIK_API": "Erro na API Freepik. Tente novamente.",
+        "ERR_FREEPIK_TRIAL_LIMIT": "Seu período gratuito da API Freepik acabou. Faça upgrade do seu plano para continuar gerando.",
+        "ERR_TMPFILES_UPLOAD": "Erro no upload temporário do arquivo",
+        "ERR_DOWNLOAD_FAILED": "Erro ao baixar o resultado",
+        "ERR_INVALID_STATUS": "Resposta inválida da API",
+        "ERR_UPLOAD": "Erro ao enviar arquivo",
+        "ERR_GENERIC": "Ocorreu um erro inesperado"
+    },
+    "validation": {
+        "promptRequired": "O prompt é obrigatório",
+        "promptTooLong": "O prompt deve ter no máximo {max} caracteres",
+        "modelRequired": "Selecione um modelo"
+    },
+    "commandBar": {
+        "attachmentsTitle": "Anexos",
+        "imageAttachmentsTitle": "Imagens guia",
+        "noAttachmentSlots": "Este modelo não possui campos de anexo",
+        "upload": "Enviar",
+        "url": "URL",
+        "add": "Adicionar",
+        "required": "Obrigatório",
+        "optional": "Opcional",
+        "imageLabel": "Imagem",
+        "urlPlaceholder": "https://...",
+        "dropSingleTitle": "Solte em {field}",
+        "dropSingleHint": "Arraste arquivos aqui para anexar neste campo"
+    }
+}

@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible problem in Flow
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Flow. Never include API keys or private media.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the current and expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Select ...
+        2. Configure ...
+        3. Click ...
+    validations:
+      required: true
+
+  - type: input
+    id: provider-model
+    attributes:
+      label: Provider and model
+      placeholder: Google AI Studio / Gemini 3.1 Flash Image
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Local Node.js
+        - Docker
+        - Vercel
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Flow version or commit
+      placeholder: main / commit SHA
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove credentials, signed URLs, personal prompts and media before posting.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed secrets and private data.
+          required: true
