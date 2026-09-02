@@ -2,7 +2,7 @@
 
 O Open-Higgsfield e uma alternativa open source ao Higgsfield para gerar imagens e videos com IA usando varios provedores em uma unica interface.
 
-[Demo](https://open-higgsfield.techbe.me) | [README principal](../README.md) | [Como contribuir](../CONTRIBUTING.md)
+[Demo](https://openhiggs.techbe.me) | [README principal](../README.md) | [Como contribuir](../CONTRIBUTING.md)
 
 ![Open-Higgsfield AI Studio](images/open-higgsfield-studio.png)
 

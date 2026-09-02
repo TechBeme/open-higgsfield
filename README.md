@@ -5,7 +5,7 @@
   <p>Generate with Freepik, Gemini, Google Vertex AI and Vercel AI Gateway models from one fast, provider-neutral studio.</p>
 
   <p>
-    <a href="https://open-higgsfield.techbe.me"><strong>Live Demo</strong></a>
+    <a href="https://openhiggs.techbe.me"><strong>Live Demo</strong></a>
     |
     <a href="#quick-start">Quick Start</a>
     |

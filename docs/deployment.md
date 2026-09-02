@@ -18,7 +18,7 @@ Do not expose provider keys through `NEXT_PUBLIC_*` variables.
 1. Import the GitHub repository into Vercel.
 2. Add only the credentials for the providers you want enabled.
 3. Add Cloudinary credentials for reference media workflows.
-4. Point `open-higgsfield.techbe.me` to the deployment.
+4. Point `openhiggs.techbe.me` to the deployment.
 5. Enable deployment protection while validating real provider calls.
 
 Vercel functions use `/tmp/open-higgsfield` automatically. That filesystem and in-memory task state are ephemeral. The UI deploys normally, but reliable asynchronous generation needs durable task storage and a queue/worker or scheduled polling strategy.

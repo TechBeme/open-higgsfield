@@ -5,7 +5,7 @@
   "description": "Open-source Higgsfield alternative for multi-provider AI image and video generation.",
   "license": "MIT",
   "author": "TechBe",
-  "homepage": "https://open-higgsfield.techbe.me",
+  "homepage": "https://openhiggs.techbe.me",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TechBeme/open-higgsfield.git"

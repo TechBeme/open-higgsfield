@@ -18,7 +18,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://open-higgsfield.techbe.me"),
+    metadataBase: new URL("https://openhiggs.techbe.me"),
     title: {
         default: "Open-Higgsfield - Open-Source Higgsfield Alternative",
         template: "%s | Open-Higgsfield",
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     },
     openGraph: {
         type: "website",
-        url: "https://open-higgsfield.techbe.me",
+        url: "https://openhiggs.techbe.me",
         siteName: "Open-Higgsfield",
         title: "Open-Higgsfield - Open-Source Higgsfield Alternative",
         description: "Generate AI images and videos across multiple providers from one free, self-hostable studio.",
