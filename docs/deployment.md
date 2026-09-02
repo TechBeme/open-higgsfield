@@ -18,10 +18,10 @@ Do not expose provider keys through `NEXT_PUBLIC_*` variables.
 1. Import the GitHub repository into Vercel.
 2. Add only the credentials for the providers you want enabled.
 3. Add Cloudinary credentials for reference media workflows.
-4. Point `flow.techbe.me` to the deployment.
+4. Point `open-higgsfield.techbe.me` to the deployment.
 5. Enable deployment protection while validating real provider calls.
 
-Vercel functions use `/tmp/flow-ai-studio` automatically. That filesystem and in-memory task state are ephemeral. The UI deploys normally, but reliable asynchronous generation needs durable task storage and a queue/worker or scheduled polling strategy.
+Vercel functions use `/tmp/open-higgsfield` automatically. That filesystem and in-memory task state are ephemeral. The UI deploys normally, but reliable asynchronous generation needs durable task storage and a queue/worker or scheduled polling strategy.
 
 ## Docker
 
@@ -39,10 +39,10 @@ The container exposes port `3000`, stores runtime data under `/app/data`, and pr
 ```bash
 npm ci
 npm run build
-FLOW_STORAGE_DIR=/var/lib/flow npm start
+OPEN_HIGGSFIELD_STORAGE_DIR=/var/lib/open-higgsfield npm start
 ```
 
-Ensure the process user can write to `FLOW_STORAGE_DIR`. Put a TLS reverse proxy in front of the app and configure upload/body limits appropriate for media generation.
+Ensure the process user can write to `OPEN_HIGGSFIELD_STORAGE_DIR`. Put a TLS reverse proxy in front of the app and configure upload/body limits appropriate for media generation.
 
 ## Production persistence
 

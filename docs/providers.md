@@ -8,7 +8,7 @@ Only the provider selected for a generation needs to be configured. All credenti
 FREEPIK_API_KEY=
 ```
 
-Flow includes Freepik image families such as Flux, Seedream and Z-Image, plus video families such as Kling, Runway, Wan, MiniMax, Seedance, PixVerse, LTX and OmniHuman.
+Open-Higgsfield includes Freepik image families such as Flux, Seedream and Z-Image, plus video families such as Kling, Runway, Wan, MiniMax, Seedance, PixVerse, LTX and OmniHuman.
 
 ## Google AI Studio
 
@@ -43,7 +43,7 @@ The current catalog includes Google, Black Forest Labs, Recraft, OpenAI, Alibaba
 
 ## Reference media uploads
 
-Some providers require a public URL for asynchronous image/video inputs. Flow uses Cloudinary for this handoff.
+Some providers require a public URL for asynchronous image/video inputs. Open-Higgsfield uses Cloudinary for this handoff.
 
 ```dotenv
 CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name

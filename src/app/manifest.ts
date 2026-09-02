@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: "Flow - AI Image & Video Studio",
-        short_name: "Flow",
+        name: "Open-Higgsfield - AI Image & Video Studio",
+        short_name: "Open-Higgsfield",
         description: "Open-source multi-provider AI image and video generation studio.",
         start_url: "/",
         display: "standalone",

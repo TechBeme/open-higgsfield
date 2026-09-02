@@ -1,11 +1,11 @@
 <div align="center">
-  <img src="public/icon.svg" width="88" alt="Flow logo" />
-  <h1>Flow</h1>
-  <p><strong>Open-source AI image and video generation studio.</strong></p>
-  <p>Run Freepik, Gemini, Google Vertex AI and Vercel AI Gateway models from one fast, provider-neutral interface.</p>
+  <img src="public/icon.svg" width="88" alt="Open-Higgsfield logo" />
+  <h1>Open-Higgsfield</h1>
+  <p><strong>The open-source Higgsfield alternative for AI image and video generation.</strong></p>
+  <p>Generate with Freepik, Gemini, Google Vertex AI and Vercel AI Gateway models from one fast, provider-neutral studio.</p>
 
   <p>
-    <a href="https://flow.techbe.me"><strong>Live Demo</strong></a>
+    <a href="https://open-higgsfield.techbe.me"><strong>Live Demo</strong></a>
     |
     <a href="#quick-start">Quick Start</a>
     |
@@ -15,23 +15,27 @@
   </p>
 
   <p>
-    <a href="https://github.com/TechBeme/flow-ai-studio/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/TechBeme/flow-ai-studio/actions/workflows/ci.yml/badge.svg" /></a>
+    <a href="https://github.com/TechBeme/open-higgsfield/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/TechBeme/open-higgsfield/actions/workflows/ci.yml/badge.svg" /></a>
     <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-d5ff47" /></a>
     <a href="https://nextjs.org"><img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" /></a>
     <a href="https://www.typescriptlang.org"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white" /></a>
-    <a href="https://github.com/TechBeme/flow-ai-studio/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/TechBeme/flow-ai-studio?style=social" /></a>
+    <a href="https://github.com/TechBeme/open-higgsfield/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/TechBeme/open-higgsfield?style=social" /></a>
   </p>
 
   <p><a href="docs/README.pt-BR.md">Leia em Portugues</a></p>
 </div>
 
-![Flow AI image and video generation studio](docs/images/flow-studio.png)
+![Open-Higgsfield AI image and video generation studio](docs/images/open-higgsfield-studio.png)
 
-## Why Flow?
+## The open-source Higgsfield alternative
 
-AI media APIs are powerful, but every provider uses different model names, payloads, upload rules, polling formats and output types. Flow puts those differences behind one normalized architecture, so creators get one consistent studio and developers get one extensible codebase.
+Open-Higgsfield is a free, self-hostable AI image and video studio for people who want a flexible alternative to closed creative platforms. Bring your own API keys, switch providers without changing tools and keep the interface, model catalog and deployment under your control.
 
-Flow currently exposes **40 curated image and video models** across four provider integrations without coupling the UI to any provider SDK.
+AI media APIs use different model names, payloads, upload rules, polling formats and output types. Open-Higgsfield puts those differences behind one normalized architecture, so creators get one consistent studio and developers get one extensible codebase.
+
+Open-Higgsfield currently exposes **40 curated image and video models** across four provider integrations without coupling the UI to any provider SDK.
+
+> Open-Higgsfield is an independent open-source project and is not affiliated with or endorsed by Higgsfield AI.
 
 ## Highlights
 
@@ -62,7 +66,7 @@ See the complete integration guide in [docs/providers.md](docs/providers.md).
 
 | Model discovery | Adaptive controls |
 | --- | --- |
-| ![Flow model selector](docs/images/flow-models.png) | ![Flow advanced generation controls](docs/images/flow-controls.png) |
+| ![Open-Higgsfield model selector](docs/images/open-higgsfield-models.png) | ![Open-Higgsfield advanced generation controls](docs/images/open-higgsfield-controls.png) |
 
 ## Quick start
 
@@ -76,8 +80,8 @@ See the complete integration guide in [docs/providers.md](docs/providers.md).
 ### Run locally
 
 ```bash
-git clone https://github.com/TechBeme/flow-ai-studio.git
-cd flow-ai-studio
+git clone https://github.com/TechBeme/open-higgsfield.git
+cd open-higgsfield
 npm install
 cp .env.example .env.local
 npm run dev
@@ -92,7 +96,7 @@ cp .env.example .env.local
 docker compose up --build
 ```
 
-Generated files and local task history are stored in the `flow-data` Docker volume.
+Generated files and local task history are stored in the `open-higgsfield-data` Docker volume.
 
 ## Configuration
 
@@ -115,7 +119,7 @@ AI_GATEWAY_API_KEY=
 CLOUDINARY_URL=
 ```
 
-Never prefix provider secrets with `NEXT_PUBLIC_`. Flow reads credentials only in server-side modules. See [.env.example](.env.example) for every supported variable.
+Never prefix provider secrets with `NEXT_PUBLIC_`. Open-Higgsfield reads credentials only in server-side modules. See [.env.example](.env.example) for every supported variable.
 
 ## How it works
 
@@ -151,9 +155,9 @@ The UI automatically derives model groups, media slots and controls from capabil
 
 ## Deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTechBeme%2Fflow-ai-studio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTechBeme%2Fopen-higgsfield)
 
-Flow can be deployed to Vercel for a public interface, but local files and in-memory tasks are ephemeral on serverless platforms. For reliable production generation, connect durable object storage and a persistent task/queue backend. The Docker deployment keeps local state on a volume and is the simplest full-featured self-hosted option today.
+Open-Higgsfield can be deployed to Vercel for a public interface, but local files and in-memory tasks are ephemeral on serverless platforms. For reliable production generation, connect durable object storage and a persistent task/queue backend. The Docker deployment keeps local state on a volume and is the simplest full-featured self-hosted option today.
 
 Read [docs/deployment.md](docs/deployment.md) before exposing a deployment that uses paid provider credentials.
 
@@ -168,7 +172,7 @@ Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.m
 
 ## Project status and roadmap
 
-Flow is actively evolving. The provider abstraction and generation studio are usable now; production infrastructure depends on the deployment target.
+Open-Higgsfield is actively evolving. The provider abstraction and generation studio are usable now; production infrastructure depends on the deployment target.
 
 - [x] Multi-provider image and video generation
 - [x] Capability-driven model controls
@@ -182,13 +186,13 @@ Flow is actively evolving. The provider abstraction and generation studio are us
 
 ## Contributing
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), browse [good first issues](https://github.com/TechBeme/flow-ai-studio/labels/good%20first%20issue), or open a discussion with a provider/model proposal.
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), browse [good first issues](https://github.com/TechBeme/open-higgsfield/labels/good%20first%20issue), or open a discussion with a provider/model proposal.
 
-If Flow is useful to you, **star the repository**. Stars help more builders discover the project and directly influence what gets prioritized next.
+If Open-Higgsfield is useful to you, **star the repository**. Stars help more builders discover the project and directly influence what gets prioritized next.
 
 ## License
 
-Flow is released under the [MIT License](LICENSE).
+Open-Higgsfield is released under the [MIT License](LICENSE).
 
 ---
 

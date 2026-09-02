@@ -1,13 +1,13 @@
 services:
-  flow:
+  open-higgsfield:
     build: .
     ports:
       - "3000:3000"
     env_file:
       - .env.local
     volumes:
-      - flow-data:/app/data
+      - open-higgsfield-data:/app/data
     restart: unless-stopped
 
 volumes:
-  flow-data:
+  open-higgsfield-data:

@@ -1,6 +1,6 @@
 # Architecture
 
-Flow separates product behavior from provider-specific API details. The command bar never needs to know how Freepik, Google or Vercel structures a request.
+Open-Higgsfield separates product behavior from provider-specific API details. The command bar never needs to know how Freepik, Google or Vercel structures a request.
 
 ## Layers
 
@@ -38,12 +38,12 @@ Freepik has model-family-specific payload and endpoint differences. Those remain
 2. A route handler validates the form and creates canonical parameters.
 3. The registry resolves the provider and upstream model ID.
 4. The provider returns generated assets or an asynchronous operation.
-5. Flow normalizes status updates and attaches completed assets to the task.
+5. Open-Higgsfield normalizes status updates and attaches completed assets to the task.
 6. The result feed receives updates and exposes reuse/download actions.
 
 ## Storage
 
-Local development stores task history, uploads and downloads on disk. `FLOW_STORAGE_DIR` changes the storage root. Vercel defaults to `/tmp/flow-ai-studio`, which is ephemeral and should not be considered durable production storage.
+Local development stores task history, uploads and downloads on disk. `OPEN_HIGGSFIELD_STORAGE_DIR` changes the storage root. Vercel defaults to `/tmp/open-higgsfield`, which is ephemeral and should not be considered durable production storage.
 
 ## Extension points
 

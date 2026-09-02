@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/TechBeme/flow-ai-studio/security/advisories/new
+    url: https://github.com/TechBeme/open-higgsfield/security/advisories/new
     about: Report security issues privately.
   - name: Questions and ideas
-    url: https://github.com/TechBeme/flow-ai-studio/discussions
+    url: https://github.com/TechBeme/open-higgsfield/discussions
     about: Ask for help or discuss a provider proposal.

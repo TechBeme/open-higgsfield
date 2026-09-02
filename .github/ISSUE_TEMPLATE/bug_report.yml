@@ -1,11 +1,11 @@
 name: Bug report
-description: Report a reproducible problem in Flow
+description: Report a reproducible problem in Open-Higgsfield
 title: "[Bug]: "
 labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: Thanks for helping improve Flow. Never include API keys or private media.
+      value: Thanks for helping improve Open-Higgsfield. Never include API keys or private media.
 
   - type: textarea
     id: description
@@ -47,7 +47,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Flow version or commit
+      label: Open-Higgsfield version or commit
       placeholder: main / commit SHA
 
   - type: textarea

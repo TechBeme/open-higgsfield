@@ -22,7 +22,7 @@ export function Header({ mode, onModeChange }: HeaderProps) {
           <Sparkles className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-bold text-sm hidden sm:inline tracking-tight">
-          Flow <span className="text-primary">AI</span>
+          Open<span className="text-primary">Higgsfield</span>
         </span>
       </div>
 

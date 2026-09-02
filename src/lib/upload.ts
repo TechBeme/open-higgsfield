@@ -39,7 +39,7 @@ async function uploadToCloudinary(buffer: Buffer, filename: string, mimeType: st
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
-    const folder = "flow-ai-studio";
+    const folder = "open-higgsfield";
 
     // Generate SHA-1 signature: sign "folder=...&timestamp=..." + apiSecret
     const { createHash } = await import("crypto");

@@ -1,22 +1,25 @@
 {
-  "name": "flow-ai-studio",
+  "name": "open-higgsfield",
   "version": "0.1.0",
   "private": true,
-  "description": "Open-source multi-provider AI image and video generation studio for Freepik, Gemini, Vertex AI and Vercel AI Gateway.",
+  "description": "Open-source Higgsfield alternative for multi-provider AI image and video generation.",
   "license": "MIT",
   "author": "TechBe",
-  "homepage": "https://flow.techbe.me",
+  "homepage": "https://open-higgsfield.techbe.me",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TechBeme/flow-ai-studio.git"
+    "url": "git+https://github.com/TechBeme/open-higgsfield.git"
   },
   "bugs": {
-    "url": "https://github.com/TechBeme/flow-ai-studio/issues"
+    "url": "https://github.com/TechBeme/open-higgsfield/issues"
   },
   "keywords": [
     "ai-image-generator",
     "ai-video-generator",
     "generative-ai",
+    "higgsfield",
+    "higgsfield-alternative",
+    "open-higgsfield",
     "gemini",
     "vertex-ai",
     "vercel-ai-gateway",

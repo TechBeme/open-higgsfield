@@ -2,7 +2,7 @@
 
 ## Our commitment
 
-We are committed to making participation in Flow a respectful, harassment-free experience for everyone, regardless of background, identity, experience level or personal characteristics.
+We are committed to making participation in Open-Higgsfield a respectful, harassment-free experience for everyone, regardless of background, identity, experience level or personal characteristics.
 
 ## Expected behavior
 

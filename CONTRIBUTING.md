@@ -1,6 +1,6 @@
-# Contributing to Flow
+# Contributing to Open-Higgsfield
 
-Thanks for helping improve Flow. Contributions can include provider integrations, model capabilities, UI improvements, documentation and bug fixes.
+Thanks for helping improve Open-Higgsfield. Contributions can include provider integrations, model capabilities, UI improvements, documentation and bug fixes.
 
 ## Before you start
 

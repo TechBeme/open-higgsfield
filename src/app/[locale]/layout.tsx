@@ -18,16 +18,19 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://flow.techbe.me"),
+    metadataBase: new URL("https://open-higgsfield.techbe.me"),
     title: {
-        default: "Flow - Open Source AI Image & Video Studio",
-        template: "%s | Flow",
+        default: "Open-Higgsfield - Open-Source Higgsfield Alternative",
+        template: "%s | Open-Higgsfield",
     },
-    description: "Generate AI images and videos with Freepik, Gemini, Google Vertex AI and Vercel AI Gateway from one open-source studio.",
+    description: "The open-source Higgsfield alternative for AI image and video generation with Freepik, Gemini, Vertex AI and Vercel AI Gateway.",
     keywords: [
         "AI image generator",
         "AI video generator",
         "open source AI studio",
+        "Higgsfield alternative",
+        "open source Higgsfield",
+        "Open-Higgsfield",
         "Gemini image generation",
         "Veo video generation",
         "Vertex AI",
@@ -38,7 +41,7 @@ export const metadata: Metadata = {
     ],
     authors: [{ name: "TechBe", url: "https://techbe.me" }],
     creator: "TechBe",
-    applicationName: "Flow",
+    applicationName: "Open-Higgsfield",
     alternates: {
         canonical: "/",
         languages: {
@@ -48,16 +51,16 @@ export const metadata: Metadata = {
     },
     openGraph: {
         type: "website",
-        url: "https://flow.techbe.me",
-        siteName: "Flow",
-        title: "Flow - Open Source AI Image & Video Studio",
-        description: "One interface for multi-provider AI image and video generation.",
-        images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Flow AI image and video studio" }],
+        url: "https://open-higgsfield.techbe.me",
+        siteName: "Open-Higgsfield",
+        title: "Open-Higgsfield - Open-Source Higgsfield Alternative",
+        description: "Generate AI images and videos across multiple providers from one free, self-hostable studio.",
+        images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Open-Higgsfield AI image and video studio" }],
     },
     twitter: {
         card: "summary_large_image",
-        title: "Flow - Open Source AI Image & Video Studio",
-        description: "One interface for multi-provider AI image and video generation.",
+        title: "Open-Higgsfield - Open-Source Higgsfield Alternative",
+        description: "Generate AI images and videos across multiple providers from one free, self-hostable studio.",
         images: ["/og-image.png"],
     },
     icons: { icon: "/icon.svg" },

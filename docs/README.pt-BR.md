@@ -1,20 +1,22 @@
-# Flow
+# Open-Higgsfield
 
-O Flow e um studio open source para gerar imagens e videos com IA usando varios provedores em uma unica interface.
+O Open-Higgsfield e uma alternativa open source ao Higgsfield para gerar imagens e videos com IA usando varios provedores em uma unica interface.
 
-[Demo](https://flow.techbe.me) | [README principal](../README.md) | [Como contribuir](../CONTRIBUTING.md)
+[Demo](https://open-higgsfield.techbe.me) | [README principal](../README.md) | [Como contribuir](../CONTRIBUTING.md)
 
-![Flow AI Studio](images/flow-studio.png)
+![Open-Higgsfield AI Studio](images/open-higgsfield-studio.png)
 
 ## O que o projeto resolve
 
-Cada API de geracao usa modelos, payloads, uploads, polling e formatos de resposta diferentes. O Flow normaliza essas diferencas em uma arquitetura modular:
+Cada API de geracao usa modelos, payloads, uploads, polling e formatos de resposta diferentes. O Open-Higgsfield normaliza essas diferencas em uma arquitetura modular:
 
 - uma interface consistente para imagem e video;
 - controles que se adaptam ao modelo selecionado;
 - providers isolados do frontend;
 - tarefas e resultados com um contrato unico;
 - suporte a texto, imagens de referencia, video e audio.
+
+> O Open-Higgsfield e um projeto independente e nao possui afiliacao ou endosso da Higgsfield AI.
 
 ## Providers
 
@@ -30,8 +32,8 @@ O catalogo inclui Gemini, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, See
 ## Inicio rapido
 
 ```bash
-git clone https://github.com/TechBeme/flow-ai-studio.git
-cd flow-ai-studio
+git clone https://github.com/TechBeme/open-higgsfield.git
+cd open-higgsfield
 npm install
 cp .env.example .env.local
 npm run dev
