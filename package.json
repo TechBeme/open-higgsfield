@@ -47,7 +47,7 @@
     "framer-motion": "^13.1.1",
     "lucide-react": "^1.39.0",
     "mime-types": "^3.0.2",
-    "next": "^16.3.4",
+    "next": "^16.4.0",
     "next-intl": "^4.14.2",
     "next-themes": "^0.4.6",
     "react": "19.2.8",
