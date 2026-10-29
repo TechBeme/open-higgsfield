@@ -1,3 +1,4 @@
+import { TOAPIS_IMAGE_CAPABILITIES } from "./toapis";
 /**
  * Image model capabilities — consumed by the frontend to render controls.
  * Migrated from image_models.json to TypeScript.
@@ -182,6 +183,7 @@ export const IMAGE_CAPABILITIES: Record<string, ImageModelCapability> = {
         sort_key: 8400,
     },
     ...EXTERNAL_IMAGE_CAPABILITIES,
+    ...TOAPIS_IMAGE_CAPABILITIES,
 };
 
 export const IMAGE_CAPABILITIES_LIST = Object.values(IMAGE_CAPABILITIES)

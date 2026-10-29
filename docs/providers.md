@@ -66,3 +66,7 @@ Freepik models that need a new payload shape also require a model-family adapter
 ## Adding a provider
 
 Implement the `GenerationProvider` interface from `src/providers/types.ts`, register it in `src/providers/registry.ts`, and add its credential documentation to `.env.example`.
+
+## Optional ToAPIs provider
+
+See [ToAPIs setup, bounded capabilities and validation](toapis-provider.md).

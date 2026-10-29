@@ -32,7 +32,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run build"
+    "check": "npm run test:toapis-provider && npm run lint && npm run typecheck && npm run build",
+    "test:toapis-provider": "node scripts/verify-toapis-provider.mjs"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.71",

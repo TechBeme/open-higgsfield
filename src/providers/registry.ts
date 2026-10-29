@@ -4,8 +4,11 @@ import { GoogleProvider } from "./google";
 import type { GenerationProvider, ProviderId } from "./types";
 import { VercelAiGatewayProvider } from "./vercel-ai-gateway";
 
+import { ToapisProvider } from "./toapis";
+
 const providers = new Map<ProviderId, GenerationProvider>([
     ["freepik", new FreepikProvider()],
+    ["toapis", new ToapisProvider()],
     ["google-ai-studio", new GoogleProvider("google-ai-studio")],
     ["google-vertex", new GoogleProvider("google-vertex")],
     ["vercel-ai-gateway", new VercelAiGatewayProvider()],
