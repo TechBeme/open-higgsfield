@@ -1,3 +1,4 @@
+import { TOAPIS_VIDEO_CAPABILITIES } from "./toapis";
 /**
  * Video model capabilities — consumed by the frontend to render controls.
  */
@@ -341,6 +342,7 @@ export const VIDEO_CAPABILITIES: Record<string, ModelCapabilities> = {
         ],
     },
     ...EXTERNAL_VIDEO_CAPABILITIES,
+    ...TOAPIS_VIDEO_CAPABILITIES,
 };
 
 /** Ordered list of group IDs for display */
