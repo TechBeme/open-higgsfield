@@ -36,7 +36,8 @@
     "lint": "eslint",
     "test": "node scripts/run-tests.mjs",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
+    "check": "npm run audit:dependencies && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.126",
