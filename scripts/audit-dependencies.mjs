@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -178,7 +178,7 @@ export function auditDependencies({ cwd = resolve("."), now = new Date() } = {})
 }
 
 export function isCliEntrypoint(moduleUrl, argvPath) {
-  return Boolean(argvPath) && resolve(fileURLToPath(moduleUrl)) === resolve(argvPath);
+  return Boolean(argvPath) && realpathSync(fileURLToPath(moduleUrl)) === realpathSync(resolve(argvPath));
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {

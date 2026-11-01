@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isCliEntrypoint, validateAuditExit, validateAuditReport } from "./audit-dependencies.mjs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
@@ -63,23 +63,25 @@ test("schema, edge, exact-copy and expiry changes fail", () => {
   assert.match(validateAuditReport({ ...report(base, counts(3)), error: {} }, reviewOptions).reason, /error/);
   assert.match(validateAuditReport(report(base, counts(3)), { ...reviewOptions, now: "invalid" }).reason, /invalid/);
   assert.match(validateAuditReport(report(base, counts(3)), { ...reviewOptions, now: "2026-12-01T00:00:00Z" }).reason, /expired/);
-  assert.equal(isCliEntrypoint(pathToFileURL(resolve("/tmp/qa audit gate/audit-dependencies.mjs")).href, "/tmp/qa audit gate/audit-dependencies.mjs"), true);
-  assert.equal(isCliEntrypoint(pathToFileURL(resolve("/tmp/qa audit gate/audit-dependencies.mjs")).href, "/tmp/qa-audit-dependencies.mjs"), false);
+  assert.equal(isCliEntrypoint(import.meta.url, fileURLToPath(import.meta.url)), true);
+  assert.equal(isCliEntrypoint(import.meta.url, fileURLToPath(new URL("./audit-dependencies.mjs", import.meta.url))), false);
+  assert.equal(isCliEntrypoint(import.meta.url, undefined), false);
 });
 
-test("CLI entrypoint with spaces fails visibly when its lockfile is absent", () => {
+test("CLI entrypoints with spaces and symlinks fail visibly when their lockfile is absent", () => {
   const directory = mkdtempSync(resolve(tmpdir(), "qa audit gate "));
   const entry = resolve(directory, "audit-dependencies.mjs");
   try {
     copyFileSync(fileURLToPath(new URL("./audit-dependencies.mjs", import.meta.url)), entry);
-    const result = spawnSync(process.execPath, [entry], { cwd: directory, encoding: "utf8" });
-    if (result.error) {
-      // The restricted local runner may forbid child processes; that is itself
-      // a failed subprocess and must never be treated as a passing audit.
-      assert.equal(result.error.code, "EPERM");
-    } else {
+    const alias = resolve(directory, "alias.mjs");
+    symlinkSync(entry, alias);
+    for (const cliPath of [entry, alias]) {
+      const result = spawnSync(process.execPath, [cliPath], { cwd: directory, encoding: "utf8", timeout: 10_000 });
+      assert.ifError(result.error);
+      assert.equal(result.signal, null);
       assert.equal(result.status, 1);
       assert.match(result.stderr, /Dependency audit gate failed/);
+      assert.match(result.stderr, /package-lock\.json/);
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
