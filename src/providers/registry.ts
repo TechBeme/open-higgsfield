@@ -3,12 +3,14 @@ import { FreepikProvider } from "./freepik";
 import { GoogleProvider } from "./google";
 import type { GenerationProvider, ProviderId } from "./types";
 import { VercelAiGatewayProvider } from "./vercel-ai-gateway";
+import { ToapisProvider } from "./toapis";
 
 const providers = new Map<ProviderId, GenerationProvider>([
     ["freepik", new FreepikProvider()],
     ["google-ai-studio", new GoogleProvider("google-ai-studio")],
     ["google-vertex", new GoogleProvider("google-vertex")],
     ["vercel-ai-gateway", new VercelAiGatewayProvider()],
+    ["toapis", new ToapisProvider()],
 ]);
 
 export function resolveProvider(caps: ModelCapabilities): {

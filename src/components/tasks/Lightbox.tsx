@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Download, Volume2, VolumeX } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { attachmentUrl } from "@/lib/download-url";
+import { useTranslations } from "next-intl";
 
 interface LightboxProps {
   images: string[];
@@ -17,6 +19,7 @@ interface LightboxProps {
 }
 
 export function Lightbox({ images, index, modelId, prompt, mediaType = "image", onClose, onNext, onPrev }: LightboxProps) {
+  const t = useTranslations("tasks");
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
 
@@ -53,7 +56,8 @@ export function Lightbox({ images, index, modelId, prompt, mediaType = "image", 
             </Button>
           )}
           <a
-            href={images[index]}
+            href={attachmentUrl(images[index])}
+            aria-label={t(isVideo ? "downloadVideo" : "downloadImage")}
             download
             target="_blank"
             rel="noreferrer"

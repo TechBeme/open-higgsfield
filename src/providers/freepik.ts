@@ -1,7 +1,8 @@
 import { getImageAdapter } from "@/models/adapters/image";
 import { getVideoAdapter } from "@/models/adapters/video";
-import { freepikGet, freepikPost, normaliseAsyncPayload, extractErrorMessage } from "@/lib/freepik-client";
+import { freepikGet, freepikPost, normaliseAsyncPayload, validateFreepikPath } from "@/lib/freepik-client";
 import type { GenerationProvider, ProviderGenerationRequest, ProviderPollRequest, ProviderPollResult, ProviderSubmission } from "./types";
+import { invalidProviderResponse, providerObject, ProviderRequestError, publicMediaUrl } from "./request-error";
 
 interface FreepikOperation {
     pollUrl: string;
@@ -14,16 +15,20 @@ export class FreepikProvider implements GenerationProvider {
         const adapter = request.mediaType === "video"
             ? getVideoAdapter(request.modelId)
             : getImageAdapter(request.modelId);
-        if (!adapter) throw new Error(`ERR_NO_ADAPTER: ${request.modelId}`);
+        if (!adapter) throw new ProviderRequestError("ERR_NO_ADAPTER");
 
-        const { endpoint, payload } = adapter.process(request.modelId, request.params, request.media);
+        let processed: ReturnType<typeof adapter.process>;
+        try { processed = adapter.process(request.modelId, request.params, request.media); }
+        catch { throw new ProviderRequestError("ERR_FREEPIK_INPUT"); }
+        const { endpoint, payload } = processed;
         if (request.params.seed !== undefined) payload.seed = request.params.seed;
-        if (!endpoint.post_path || !endpoint.poll_path) throw new Error("ERR_MODEL_NO_ENDPOINT");
+        if (!endpoint.post_path || !endpoint.poll_path) throw new ProviderRequestError("ERR_MODEL_NO_ENDPOINT");
+        validateFreepikPath(endpoint.poll_path.replace("{task_id}", "pending"));
 
-        const response = await freepikPost(endpoint.post_path, payload) as Record<string, unknown>;
-        const root = (response.data ?? response) as Record<string, unknown>;
-        const taskId = root.task_id as string | undefined;
-        if (!taskId) throw new Error("ERR_NO_TASK_ID");
+        const response = providerObject(await freepikPost(endpoint.post_path, payload, request.signal), "FREEPIK", "submit");
+        const root = providerObject(response.data ?? response, "FREEPIK", "submit");
+        const taskId = root.task_id;
+        if (typeof taskId !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(taskId)) throw invalidProviderResponse("FREEPIK", "submit");
 
         return {
             status: "CREATED",
@@ -33,41 +38,46 @@ export class FreepikProvider implements GenerationProvider {
     }
 
     async poll(request: ProviderPollRequest): Promise<ProviderPollResult> {
-        const operation = request.operation as FreepikOperation;
-        if (!operation?.pollUrl) throw new Error("ERR_INVALID_PROVIDER_OPERATION");
+        const operation = providerObject(request.operation, "FREEPIK", "poll") as unknown as FreepikOperation;
+        validateFreepikPath(operation.pollUrl);
 
-        const payload = await freepikGet(operation.pollUrl) as Record<string, unknown>;
+        const payload = providerObject(await freepikGet(operation.pollUrl, request.signal), "FREEPIK", "poll");
+        providerObject(payload.data ?? payload, "FREEPIK", "poll");
         if (request.mediaType === "image") {
             const { status, urls } = normaliseAsyncPayload(payload);
-            if (!status) throw new Error("ERR_INVALID_STATUS");
+            if (!status) throw invalidProviderResponse("FREEPIK", "poll");
             const normalized = status.toUpperCase();
             if (normalized === "COMPLETED") {
-                return { status: "COMPLETED", assets: urls.map((url) => ({ url })), operation };
+                if (urls.length === 0) throw invalidProviderResponse("FREEPIK", "poll");
+                return { status: "COMPLETED", assets: urls.map((url) => ({ url: publicMediaUrl(url, "ERR_FREEPIK_OUTPUT") })), operation };
             }
             if (["FAILED", "ERROR", "CANCELLED"].includes(normalized)) {
                 return {
                     status: normalized as "FAILED" | "ERROR" | "CANCELLED",
-                    error: extractErrorMessage(payload) ?? `Task failed with status ${normalized}`,
+                    error: `ERR_FREEPIK_TASK_${normalized}`,
                     operation,
                 };
             }
-            return { status: "IN_PROGRESS", operation };
+            if (["CREATED", "IN_PROGRESS", "PENDING", "QUEUED"].includes(normalized)) return { status: "IN_PROGRESS", operation };
+            throw invalidProviderResponse("FREEPIK", "poll");
         }
 
         const data = (payload.data ?? payload) as Record<string, unknown>;
-        const status = String(data.status ?? "IN_PROGRESS").toUpperCase();
+        const status = typeof data.status === "string" ? data.status.toUpperCase() : "";
         if (status === "COMPLETED") {
             const generated = typeof data.generated === "string" ? [data.generated] : data.generated;
             const urls = Array.isArray(generated) ? generated.filter((value): value is string => typeof value === "string") : [];
-            return { status: "COMPLETED", assets: urls.map((url) => ({ url, mimeType: "video/mp4" })), operation };
+            if (urls.length === 0) throw invalidProviderResponse("FREEPIK", "poll");
+            return { status: "COMPLETED", assets: urls.map((url) => ({ url: publicMediaUrl(url, "ERR_FREEPIK_OUTPUT"), mimeType: "video/mp4" })), operation };
         }
         if (["FAILED", "ERROR", "CANCELLED"].includes(status)) {
             return {
                 status: status as "FAILED" | "ERROR" | "CANCELLED",
-                error: extractErrorMessage(payload) ?? `Task failed with status ${status}`,
+                error: `ERR_FREEPIK_TASK_${status}`,
                 operation,
             };
         }
-        return { status: "IN_PROGRESS", operation };
+        if (["CREATED", "IN_PROGRESS", "PENDING", "QUEUED"].includes(status)) return { status: "IN_PROGRESS", operation };
+        throw invalidProviderResponse("FREEPIK", "poll");
     }
 }

@@ -1,59 +1,51 @@
+import { createProviderTransport, invalidProviderResponse, providerHttpError, ProviderRequestError } from "@/providers/request-error";
+
 const BASE = "https://api.freepik.com";
 
 function getApiKey(): string {
     return process.env.FREEPIK_API_KEY ?? "";
 }
 
-export async function freepikPost(path: string, body: unknown): Promise<unknown> {
-    const key = getApiKey();
-    if (!key) throw new Error("ERR_NO_API_KEY");
-
-    const res = await fetch(`${BASE}${path}`, {
-        method: "POST",
-        headers: {
-            "x-freepik-api-key": key,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-        if (res.status === 429) {
-            throw new Error("ERR_FREEPIK_TRIAL_LIMIT");
-        }
-        const detail = extractErrorMessage(data);
-        throw new Error(detail ?? "ERR_FREEPIK_API");
-    }
-    return data;
+export function validateFreepikPath(path: unknown): asserts path is string {
+    if (typeof path !== "string" || path.length > 1000 || !/^\/v1\/ai\/[A-Za-z0-9_./-]+$/.test(path)
+        || path.includes("..") || path.includes("//")) throw new ProviderRequestError("ERR_FREEPIK_OPERATION");
 }
 
-export async function freepikGet(path: string): Promise<unknown> {
+async function freepikRequest(path: string, phase: "submit" | "poll", body?: unknown, signal?: AbortSignal): Promise<unknown> {
     const key = getApiKey();
-    if (!key) throw new Error("ERR_NO_API_KEY");
-
-    const res = await fetch(`${BASE}${path}`, {
-        headers: { "x-freepik-api-key": key },
-        cache: "no-store",
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-        if (res.status === 429) {
-            throw new Error("ERR_FREEPIK_TRIAL_LIMIT");
+    if (!key.trim()) throw new ProviderRequestError("ERR_NO_API_KEY");
+    validateFreepikPath(path);
+    const transport = createProviderTransport("FREEPIK", phase, signal);
+    transport.assertActive();
+    try {
+        const res = await transport.fetch(`${BASE}${path}`, {
+            method: phase === "submit" ? "POST" : "GET", cache: "no-store",
+            headers: { "x-freepik-api-key": key, "Content-Type": "application/json" },
+            ...(phase === "submit" ? { body: JSON.stringify(body) } : {}),
+        });
+        if (!res.ok) {
+            await res.body?.cancel();
+            throw providerHttpError("FREEPIK", phase, res.status, res.headers.get("retry-after"));
         }
-        const detail = extractErrorMessage(data);
-        throw new Error(detail ?? "ERR_FREEPIK_API");
-    }
-    return data;
+        try { return await res.json(); } catch { throw invalidProviderResponse("FREEPIK", phase); }
+    } catch (error) { throw transport.classify(error); }
+}
+
+export function freepikPost(path: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
+    return freepikRequest(path, "submit", body, signal);
+}
+
+export function freepikGet(path: string, signal?: AbortSignal): Promise<unknown> {
+    return freepikRequest(path, "poll", undefined, signal);
 }
 
 export function normaliseAsyncPayload(payload: Record<string, unknown>): { status: string | null; urls: string[] } {
     const root = (payload.data as Record<string, unknown>) ?? payload;
-    const status = (root.status ?? root.task_status) as string | null;
-    let generated = (root.generated ?? []) as string | string[];
+    const rawStatus = root.status ?? root.task_status;
+    const status = typeof rawStatus === "string" ? rawStatus : null;
+    let generated = root.generated ?? [];
     if (typeof generated === "string") generated = [generated];
-    return { status, urls: generated as string[] };
+    return { status, urls: Array.isArray(generated) ? generated.filter((value): value is string => typeof value === "string") : [] };
 }
 
 export function extractErrorMessage(payload: unknown): string | null {

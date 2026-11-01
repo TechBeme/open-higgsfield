@@ -3,6 +3,7 @@
  */
 import type { ModelCapabilities } from "./types";
 import { EXTERNAL_VIDEO_CAPABILITIES } from "./external";
+import { TOAPIS_VIDEO_CAPABILITIES } from "./toapis";
 
 export const VIDEO_CAPABILITIES: Record<string, ModelCapabilities> = {
     "kling-v3-pro": {
@@ -341,12 +342,13 @@ export const VIDEO_CAPABILITIES: Record<string, ModelCapabilities> = {
         ],
     },
     ...EXTERNAL_VIDEO_CAPABILITIES,
+    ...TOAPIS_VIDEO_CAPABILITIES,
 };
 
 /** Ordered list of group IDs for display */
 export const VIDEO_CAPABILITY_GROUPS = [
     "Kling", "RunWay", "WAN", "MiniMax", "Seedance", "PixVerse", "LTX", "OmniHuman",
-    "Google AI Studio", "Google Vertex AI", "Vercel AI Gateway",
+    "Google AI Studio", "Google Vertex AI", "Vercel AI Gateway", "ToAPIs",
 ];
 
 /** Get all capabilities for models in a given group */

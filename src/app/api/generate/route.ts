@@ -3,41 +3,61 @@ import { VIDEO_CAPABILITIES } from "@/models/capabilities/video";
 import { getVideoAdapter } from "@/models/adapters/video";
 import { submitGeneration } from "@/lib/generation-service";
 import { processImageUpload, processFileUpload, resolveUrl } from "@/lib/media-upload";
-import { publicErrorMessage } from "@/lib/public-error";
+import { safeErrorCode } from "@/lib/task-runtime";
+import { elementCounts, inputFile, objectField, objectValue, preprocessingFailure } from "@/lib/generation-input";
+import { guardWorkspaceRequest } from "@/lib/workspace-access";
+import { assertGenerationEnabled } from "@/lib/production-config";
+import { readGenerationForm, requestFailure } from "@/lib/request-limits";
 import type { CanonicalParams, CanonicalMediaInputs } from "@/models/canonical";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 300;
+
+function rejection(error: string) {
+  return NextResponse.json({ error, accepted: false, recovery_required: false }, { status: 400 });
+}
 
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
+  const denial = guardWorkspaceRequest(req);
+  if (denial) return denial;
+  const signal = AbortSignal.any([req.signal, AbortSignal.timeout(270_000)]);
+  let form: FormData;
+  try {
+    assertGenerationEnabled();
+    form = await readGenerationForm(req, { signal });
+  } catch (error) { return requestFailure(error); }
 
+  try { return await prepareGeneration(form, signal); }
+  catch (error) { return preprocessingFailure(error, signal); }
+}
+
+async function prepareGeneration(form: FormData, signal: AbortSignal) {
+  signal.throwIfAborted();
   // ── Parse canonical params from FormData ─────────────────────────────────
   const modelId = String(form.get("model_id") ?? "").trim();
   const caps = VIDEO_CAPABILITIES[modelId];
   if (!caps) {
-    return NextResponse.json({ error: `ERR_UNKNOWN_MODEL: ${modelId}` }, { status: 400 });
+    return rejection("ERR_UNKNOWN_MODEL");
   }
   const adapter = (caps.provider ?? "freepik") === "freepik" ? getVideoAdapter(modelId) : undefined;
   if ((caps.provider ?? "freepik") === "freepik" && !adapter) {
-    return NextResponse.json({ error: `ERR_NO_ADAPTER: ${modelId}` }, { status: 400 });
+    return rejection("ERR_NO_ADAPTER");
   }
 
-  const settingsRaw = String(form.get("settings") ?? "{}");
-  let settings: Record<string, unknown> = {};
-  try { settings = JSON.parse(settingsRaw); } catch { }
+  const settings = objectField(form, "settings", "ERR_INVALID_SETTINGS");
+  const referenceCounts = elementCounts(form, caps.elements);
 
   const prompt = String(form.get("prompt") ?? "").trim();
   if (caps.prompt_required && !prompt) {
-    return NextResponse.json({ error: "ERR_PROMPT_REQUIRED" }, { status: 400 });
+    return rejection("ERR_PROMPT_REQUIRED");
   }
   const promptMax = caps.prompt_max ?? 2500;
   if (prompt && prompt.length > promptMax) {
-    return NextResponse.json({ error: "ERR_PROMPT_TOO_LONG" }, { status: 400 });
+    return rejection("ERR_PROMPT_TOO_LONG");
   }
 
   // Build canonical params from settings
-  const fieldValues = (settings.fieldValues as Record<string, unknown>) ?? {};
+  const fieldValues = settings.fieldValues === undefined ? {} : objectValue(settings.fieldValues, "ERR_INVALID_FIELD_VALUES");
   const canonicalParams: CanonicalParams = {
     model_id: modelId,
     prompt,
@@ -57,7 +77,7 @@ export async function POST(req: NextRequest) {
   // ── Validate params against capabilities ─────────────────────────────────
   const validationErrors = adapter?.validate(modelId, canonicalParams, caps) ?? [];
   if (validationErrors.length > 0) {
-    return NextResponse.json({ error: validationErrors[0] }, { status: 400 });
+    return rejection(validationErrors[0]);
   }
 
   // ── Process media uploads ────────────────────────────────────────────────
@@ -66,77 +86,51 @@ export async function POST(req: NextRequest) {
   let audioUrl: string | undefined;
 
   for (const slot of caps.media_slots) {
-    const file = form.get(`file_${slot.id}`) as File | null;
+    signal.throwIfAborted();
+    const value = form.get(`file_${slot.id}`);
+    const file = value instanceof File ? value : null;
     let url = String(form.get(`url_${slot.id}`) ?? "").trim();
-
     if (file && file.size > 0) {
-      try {
-        const buf = Buffer.from(await file.arrayBuffer());
-        if (slot.kind === "image") {
-          const result = await processImageUpload(buf);
-          url = result.remoteUrl;
-        } else {
-          const mimeType = file.type || (slot.kind === "video" ? "video/mp4" : "application/octet-stream");
-          const result = await processFileUpload(buf, file.name, mimeType);
-          url = result.remoteUrl;
-        }
-      } catch (e) {
-        return NextResponse.json({ error: `Upload failed for ${slot.label}: ${e}` }, { status: 400 });
-      }
-    } else if (url) {
-      try {
-        const resolved = await resolveUrl(url);
-        url = resolved.remoteUrl;
-      } catch (e) {
-        return NextResponse.json({ error: `Failed to resolve upload: ${e}` }, { status: 400 });
-      }
-    }
-
+      const kindMime = slot.kind === "video" ? "video/mp4" : slot.kind === "audio" ? "audio/mpeg" : "image/jpeg";
+      const buf = await inputFile(file, kindMime, signal);
+      const result = slot.kind === "image"
+        ? await processImageUpload(buf, { signal })
+        : await processFileUpload(buf, file.name, file.type || kindMime, { signal });
+      url = result.remoteUrl;
+    } else if (url) url = (await resolveUrl(url, { signal })).remoteUrl;
     if (url) {
       if (slot.kind === "video") videoUrl = url;
       else if (slot.kind === "audio") audioUrl = url;
       else images[slot.id] = url;
-    } else if (slot.required) {
-      return NextResponse.json({ error: `Missing required attachment: ${slot.label}` }, { status: 400 });
-    }
+    } else if (slot.required) return rejection("ERR_SLOT_REQUIRED");
   }
 
-  // ── Handle elements ──────────────────────────────────────────────────────
   const elementsPayload: Array<{ frontal_image_url?: string; reference_image_urls?: string[] }> = [];
-  if (caps.elements) {
-    const elemCount = parseInt(String(form.get("elem_count") ?? "0"), 10);
-    for (let i = 0; i < elemCount; i++) {
-      const frontalFile = form.get(`file_elem_${i}_frontal`) as File | null;
-      let frontalUrl = String(form.get(`url_elem_${i}_frontal`) ?? "").trim();
-
-      if (frontalFile && frontalFile.size > 0) {
-        const buf = Buffer.from(await frontalFile.arrayBuffer());
-        const result = await processImageUpload(buf);
-        frontalUrl = result.remoteUrl;
-      } else if (frontalUrl.startsWith("/api/uploaded/")) {
-        try { frontalUrl = (await resolveUrl(frontalUrl)).remoteUrl; } catch { frontalUrl = ""; }
-      }
-
-      const refCount = parseInt(String(form.get(`elem_${i}_ref_count`) ?? "0"), 10);
-      const refUrls: string[] = [];
-      for (let j = 0; j < refCount; j++) {
-        const refFile = form.get(`file_elem_${i}_ref_${j}`) as File | null;
-        let refUrl = String(form.get(`url_elem_${i}_ref_${j}`) ?? "").trim();
-        if (refFile && refFile.size > 0) {
-          const buf = Buffer.from(await refFile.arrayBuffer());
-          const result = await processImageUpload(buf);
-          refUrl = result.remoteUrl;
-        } else if (refUrl.startsWith("/api/uploaded/")) {
-          try { refUrl = (await resolveUrl(refUrl)).remoteUrl; } catch { refUrl = ""; }
-        }
-        if (refUrl) refUrls.push(refUrl);
-      }
-
-      const elem: { frontal_image_url?: string; reference_image_urls?: string[] } = {};
-      if (frontalUrl) elem.frontal_image_url = frontalUrl;
-      if (refUrls.length > 0) elem.reference_image_urls = refUrls;
-      if (frontalUrl || refUrls.length > 0) elementsPayload.push(elem);
+  for (const [i, refCount] of referenceCounts.entries()) {
+    signal.throwIfAborted();
+    const frontalValue = form.get(`file_elem_${i}_frontal`);
+    const frontalFile = frontalValue instanceof File ? frontalValue : null;
+    let frontalUrl = String(form.get(`url_elem_${i}_frontal`) ?? "").trim();
+    if (frontalFile && frontalFile.size > 0) {
+      const buffer = await inputFile(frontalFile, "image/jpeg", signal);
+      frontalUrl = (await processImageUpload(buffer, { signal })).remoteUrl;
+    } else if (frontalUrl) frontalUrl = (await resolveUrl(frontalUrl, { signal })).remoteUrl;
+    const refUrls: string[] = [];
+    for (let j = 0; j < refCount; j++) {
+      signal.throwIfAborted();
+      const refValue = form.get(`file_elem_${i}_ref_${j}`);
+      const refFile = refValue instanceof File ? refValue : null;
+      let refUrl = String(form.get(`url_elem_${i}_ref_${j}`) ?? "").trim();
+      if (refFile && refFile.size > 0) {
+        const buffer = await inputFile(refFile, "image/jpeg", signal);
+        refUrl = (await processImageUpload(buffer, { signal })).remoteUrl;
+      } else if (refUrl) refUrl = (await resolveUrl(refUrl, { signal })).remoteUrl;
+      if (refUrl) refUrls.push(refUrl);
     }
+    const element: { frontal_image_url?: string; reference_image_urls?: string[] } = {};
+    if (frontalUrl) element.frontal_image_url = frontalUrl;
+    if (refUrls.length) element.reference_image_urls = refUrls;
+    if (frontalUrl || refUrls.length) elementsPayload.push(element);
   }
 
   const media: CanonicalMediaInputs = {
@@ -146,9 +140,12 @@ export async function POST(req: NextRequest) {
     elements: elementsPayload.length > 0 ? elementsPayload : undefined,
   };
 
+  signal.throwIfAborted();
+
   // ── Submit through the selected provider ─────────────────────────────────
   try {
-    const taskId = await submitGeneration({
+    const result = await submitGeneration({
+      signal,
       mediaType: "video",
       modelId,
       capabilities: caps,
@@ -156,9 +153,10 @@ export async function POST(req: NextRequest) {
       media,
       reuseState: { settings },
     });
-    return NextResponse.json({ task_id: taskId });
+    const { httpStatus, ...body } = result;
+    return NextResponse.json(body, { status: httpStatus });
   } catch (err) {
-    const msg = publicErrorMessage(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const cancelled = signal.aborted || safeErrorCode(err) === "ERR_REQUEST_CANCELLED";
+    return NextResponse.json({ error: cancelled ? "ERR_REQUEST_CANCELLED" : "ERR_TASK_STORAGE_UNAVAILABLE", accepted: false, recovery_required: false }, { status: cancelled ? 408 : 503 });
   }
 }

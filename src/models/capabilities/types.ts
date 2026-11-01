@@ -2,6 +2,7 @@
  * ModelCapabilities — tells the frontend which controls to render per model.
  * Importable on both client and server (no side-effects).
  */
+import type { ProviderId } from "@/providers/types";
 
 export interface FieldOption {
     label: string;
@@ -49,7 +50,7 @@ export interface ModelCapabilities {
     category?: string;
 
     /** API provider used to execute this model. Legacy entries default to Freepik. */
-    provider?: "freepik" | "google-ai-studio" | "google-vertex" | "vercel-ai-gateway";
+    provider?: ProviderId;
     /** Model identifier expected by the upstream provider. */
     provider_model_id?: string;
     /** Selects the provider API surface when a provider exposes more than one. */

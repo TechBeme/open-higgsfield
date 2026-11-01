@@ -106,6 +106,11 @@
     "tasks": {
         "feedTitle": "Generations",
         "taskCount": "tasks",
+        "loadingHistory": "Loading generations...",
+        "historyError": "Could not load generations. Your existing tasks are preserved.",
+        "retryHistory": "Reload history",
+        "loadMore": "Load more",
+        "recoveryRequired": "Needs attention. This generation may already be running or complete. Check its status before submitting again.",
         "empty": "No generations yet. Configure a model and write a prompt to get started.",
         "seeMore": "See more",
         "seeLess": "See less",
@@ -147,7 +152,22 @@
         "ERR_DOWNLOAD_FAILED": "Error downloading result",
         "ERR_INVALID_STATUS": "Invalid API response",
         "ERR_UPLOAD": "Error uploading file",
-        "ERR_GENERIC": "An unexpected error occurred"
+        "ERR_GENERIC": "An unexpected error occurred",
+        "ERR_SUBMISSION_OUTCOME_UNKNOWN": "The submission outcome is unknown. Do not submit again. Check history and your provider dashboard first; the generation may already be running or charged.",
+        "ERR_ASSET_STORAGE_INCOMPLETE": "The provider returned a result, but saving it is incomplete. Do not submit again. Check the task and contact your workspace operator.",
+        "ERR_GENERATION_DISABLED": "New generations are disabled by the workspace operator.",
+        "ERR_GENERATION_CONFIG": "The workspace needs configuration before it can accept new generations.",
+        "ERR_ACCESS_CONFIG": "Workspace access is not configured. Contact the operator.",
+        "ERR_DEPLOYMENT_CONFIG": "The workspace deployment is not ready for generation.",
+        "ERR_SCHEDULER_CONFIG": "Task recovery is not configured. Contact the workspace operator.",
+        "ERR_UNAUTHORIZED": "Sign in to the workspace before continuing.",
+        "ERR_ORIGIN_FORBIDDEN": "This request must come from the workspace's configured address.",
+        "ERR_TASK_STORAGE_UNAVAILABLE": "Task storage is unavailable. This request was not submitted to the provider.",
+        "ERR_REQUEST_TOO_LARGE": "The entire upload must be under 4 MiB, including all attachments and form fields. Use a supported public reference URL for larger files.",
+        "ERR_FORM_LIMIT": "Too many attachments or form fields, or a field is too large. Reduce the request and try again.",
+        "ERR_CONTENT_TYPE": "The request format is not supported.",
+        "ERR_INVALID_FORM_DATA": "The upload could not be read. Check the attachments.",
+        "ERR_REQUEST_CANCELLED": "The upload was interrupted before generation was submitted."
     },
     "validation": {
         "promptRequired": "Prompt is required",
@@ -166,6 +186,10 @@
         "imageLabel": "Image",
         "urlPlaceholder": "https://...",
         "dropSingleTitle": "Drop {field}",
-        "dropSingleHint": "Drag files here to attach to this field"
+        "dropSingleHint": "Drag files here to attach to this field",
+        "submitting": "Submitting...",
+        "reviewRequired": "Review needed",
+        "reviewedSubmission": "I checked the task status",
+        "uploadLimit": "All attachments and form fields: under 4 MiB total. Use a supported public URL for larger references."
     }
 }

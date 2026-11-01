@@ -1,3 +1,6 @@
+import type { ProviderId } from "@/providers/types";
+import type { TaskPhase } from "@/lib/task-record";
+
 export type MediaType = "video" | "image";
 
 export interface SizeUiAspectRatio {
@@ -35,10 +38,18 @@ export interface TaskEvent {
     message?: string;
 }
 
-export interface VideoTask {
+interface TaskLifecycleFields {
+    revision?: number;
+    lifecycle_phase?: TaskPhase;
+    recovery_required?: boolean;
+    has_download?: boolean;
+    result_count?: number;
+}
+
+export interface VideoTask extends TaskLifecycleFields {
     task_id: string;
     status?: string;
-    provider_id?: "freepik" | "google-ai-studio" | "google-vertex" | "vercel-ai-gateway";
+    provider_id?: ProviderId;
     provider_model_id?: string;
     provider_task_id?: string;
     provider_operation?: unknown;
@@ -62,10 +73,10 @@ export interface VideoTask {
     _done?: boolean;
 }
 
-export interface ImageTask {
+export interface ImageTask extends TaskLifecycleFields {
     task_id: string;
     status?: string;
-    provider_id?: "freepik" | "google-ai-studio" | "google-vertex" | "vercel-ai-gateway";
+    provider_id?: ProviderId;
     provider_model_id?: string;
     provider_task_id?: string;
     provider_operation?: unknown;

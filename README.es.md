@@ -145,6 +145,8 @@ CLOUDINARY_URL=
 
 Abre [http://localhost:3000](http://localhost:3000). Nunca uses `NEXT_PUBLIC_` para credenciales de proveedores.
 
+El desarrollo escucha en `127.0.0.1`. Sin credenciales, mantén el servidor local; configura una contraseña y un origen HTTPS antes de exponer otro entorno.
+
 ### Docker
 
 ```bash
@@ -154,10 +156,11 @@ docker compose up --build
 
 ## Despliegue en Vercel
 
-Usa el botón **Deploy with Vercel** de la parte superior y añade únicamente las credenciales de los proveedores que quieras habilitar. Configura `DATABASE_URL` para conservar el historial y las imágenes generadas en PostgreSQL/Neon. Las cargas temporales, los videos y los workers asíncronos todavía requieren object storage y colas duraderas. Consulta [Despliegue](docs/deployment.md).
+Producción requiere una credencial del operador, origen HTTPS, PostgreSQL migrado, medios públicos en Cloudinary y ejecución recurrente. El cron por minuto incluido requiere Vercel Pro o Enterprise. Las nuevas generaciones quedan desactivadas hasta configurar `GENERATION_ENABLED=true`.
 
-> [!WARNING]
-> Open-Higgsfield no incluye autenticación, rate limiting ni límites de gasto por usuario. Protege los despliegues públicos conectados a cuentas facturables.
+Es un espacio compartido: quien tiene la credencial accede a todas las tareas y utiliza las mismas cuentas de proveedores. No hay aislamiento por usuario, presupuesto monetario ni límite global de solicitudes en la aplicación. Configura cuotas de proveedores y protección de entrada. Los archivos de Cloudinary siguen siendo públicos por URL.
+
+Sigue la [guía de operación](docs/production.md) antes de iniciar Docker o publicar en Vercel; describe configuración, migración, HTTPS, programación y recuperación.
 
 ## Comandos
 

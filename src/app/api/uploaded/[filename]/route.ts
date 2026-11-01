@@ -1,31 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import path from "path";
-import fs from "fs";
-import mime from "mime-types";
-import { STORAGE_ROOT } from "@/lib/storage-paths";
+import { NextRequest } from "next/server";
+import { assetErrorResponse, uploadedAssetResponse } from "@/lib/asset-source";
+import { guardWorkspaceRequest } from "@/lib/workspace-access";
 
-const UPLOADS_DIR = path.join(STORAGE_ROOT, "uploads");
+export const runtime = "nodejs";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ filename: string }> }
-) {
-  const { filename } = await params;
-  // Prevent path traversal
-  const safe = path.basename(filename);
-  const filePath = path.join(UPLOADS_DIR, safe);
-
-  if (!fs.existsSync(filePath)) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const buf = fs.readFileSync(filePath);
-  const mimeType = mime.lookup(filePath) || "application/octet-stream";
-
-  return new NextResponse(buf, {
-    headers: {
-      "Content-Type": mimeType,
-      "Cache-Control": "public, max-age=86400",
-    },
-  });
+export async function GET(req: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
+    const denial = guardWorkspaceRequest(req);
+    if (denial) return denial;
+    try { return await uploadedAssetResponse((await params).filename, req); }
+    catch (error) { return assetErrorResponse(error); }
 }

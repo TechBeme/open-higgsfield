@@ -1,5 +1,5 @@
 import type { CanonicalMediaInputs } from "@/models/canonical";
-import { assertSafeRemoteUrl } from "@/lib/safe-url";
+import { fetchRemoteMedia, type TransferOptions } from "@/lib/media-transfer";
 
 export function getMediaUrls(media: CanonicalMediaInputs): string[] {
     const values = Object.values(media.images ?? {}) as unknown[];
@@ -16,14 +16,8 @@ export function getImageUrl(media: CanonicalMediaInputs, ...keys: string[]): str
     return undefined;
 }
 
-export async function fetchMedia(url: string): Promise<{ data: Uint8Array; mimeType: string }> {
-    const safeUrl = await assertSafeRemoteUrl(url);
-    const response = await fetch(safeUrl, { redirect: "error" });
-    if (!response.ok) throw new Error(`ERR_MEDIA_DOWNLOAD: ${response.status}`);
-    return {
-        data: new Uint8Array(await response.arrayBuffer()),
-        mimeType: response.headers.get("content-type")?.split(";")[0] || "application/octet-stream",
-    };
+export async function fetchMedia(url: string, options: TransferOptions = {}): Promise<{ data: Uint8Array; mimeType: string }> {
+    return fetchRemoteMedia(url, options);
 }
 
 export function toSerializable(value: unknown): unknown {

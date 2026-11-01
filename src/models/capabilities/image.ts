@@ -4,6 +4,7 @@
  */
 import type { ModelCapabilities } from "./types";
 import { EXTERNAL_IMAGE_CAPABILITIES } from "./external";
+import { TOAPIS_IMAGE_CAPABILITIES } from "./toapis";
 
 /** Extended image capability with image-specific fields */
 export interface ImageModelCapability extends ModelCapabilities {
@@ -182,6 +183,7 @@ export const IMAGE_CAPABILITIES: Record<string, ImageModelCapability> = {
         sort_key: 8400,
     },
     ...EXTERNAL_IMAGE_CAPABILITIES,
+    ...TOAPIS_IMAGE_CAPABILITIES,
 };
 
 export const IMAGE_CAPABILITIES_LIST = Object.values(IMAGE_CAPABILITIES)

@@ -29,7 +29,7 @@ interface ImageSlotProps {
     label: string;
     multiple?: boolean;
     entries: ImageEntry[];
-    onAdd: (entry: ImageEntry) => void;
+    onAdd: (entries: ImageEntry[]) => void;
     onRemove: (id: string) => void;
 }
 
@@ -37,18 +37,25 @@ function ImageSlot({ label, multiple = false, entries, onAdd, onRemove }: ImageS
     const fileRef = useRef<HTMLInputElement>(null);
     const [urlValue, setUrlValue] = useState("");
     const [dragOver, setDragOver] = useState(false);
+    const [limitError, setLimitError] = useState<string | null>(null);
+    const maxEntries = multiple ? 3 : 1;
 
-    const addFile = useCallback((file: File) => {
-        if (!multiple && entries.length > 0) return;
-        const preview = URL.createObjectURL(file);
-        onAdd({ id: shortId(), file, preview });
-    }, [entries.length, multiple, onAdd]);
+    const addFiles = useCallback((files: File[]) => {
+        if (files.length === 0) return;
+        if (entries.length + files.length > maxEntries) {
+            setLimitError(`Choose at most ${maxEntries - entries.length} more image(s).`);
+            return;
+        }
+        setLimitError(null);
+        onAdd(files.map((file) => ({ id: shortId(), file, preview: URL.createObjectURL(file) })));
+    }, [entries.length, maxEntries, onAdd]);
 
     function addUrl() {
         const url = urlValue.trim();
         if (!url) return;
-        if (!multiple && entries.length > 0) return;
-        onAdd({ id: shortId(), url });
+        if (entries.length >= maxEntries) return;
+        setLimitError(null);
+        onAdd([{ id: shortId(), url }]);
         setUrlValue("");
     }
 
@@ -56,18 +63,17 @@ function ImageSlot({ label, multiple = false, entries, onAdd, onRemove }: ImageS
         (e: React.DragEvent) => {
             e.preventDefault();
             setDragOver(false);
-            Array.from(e.dataTransfer.files)
-                .filter((f) => f.type.startsWith("image/"))
-                .forEach(addFile);
+            addFiles(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/")));
         },
-        [addFile],
+        [addFiles],
     );
 
-    const canAdd = multiple || entries.length === 0;
+    const canAdd = entries.length < maxEntries;
 
     return (
         <div className="space-y-1.5">
             <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+            {limitError && <p role="alert" className="text-[11px] text-destructive">{limitError}</p>}
 
             {entries.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -119,7 +125,7 @@ function ImageSlot({ label, multiple = false, entries, onAdd, onRemove }: ImageS
                             multiple={multiple}
                             className="hidden"
                             onChange={(e) => {
-                                if (e.target.files) Array.from(e.target.files).forEach(addFile);
+                                if (e.target.files) addFiles(Array.from(e.target.files));
                                 e.target.value = "";
                             }}
                         />
@@ -171,15 +177,15 @@ function ElementCard({ index, element, onChange, onRemove }: ElementCardProps) {
                 label="Frontal Image (optional)"
                 multiple={false}
                 entries={element.frontal ? [element.frontal] : []}
-                onAdd={(entry) => onChange({ ...element, frontal: entry })}
+                onAdd={(entries) => onChange({ ...element, frontal: entries[0] })}
                 onRemove={() => onChange({ ...element, frontal: null })}
             />
 
             <ImageSlot
-                label="Reference Images (optional, multiple)"
+                label="Reference Images (optional, up to 3)"
                 multiple={true}
                 entries={element.refs}
-                onAdd={(entry) => onChange({ ...element, refs: [...element.refs, entry] })}
+                onAdd={(entries) => onChange({ ...element, refs: [...element.refs, ...entries] })}
                 onRemove={(id) => onChange({ ...element, refs: element.refs.filter((r) => r.id !== id) })}
             />
         </div>

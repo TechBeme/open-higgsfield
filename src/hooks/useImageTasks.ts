@@ -1,24 +1,12 @@
 "use client";
 
-import useSWR, { mutate as globalMutate } from "swr";
+import { imageHistoryKey, revalidateHistory, useTaskHistory } from "@/hooks/useTaskHistory";
 import type { ImageTask } from "@/types";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
 export function useImageTasks() {
-  const { data, error, isLoading, mutate } = useSWR<ImageTask[]>("/api/image-tasks", fetcher, {
-    refreshInterval: (data) => data?.some((t) => !t._done) ? 3000 : 0,
-    revalidateOnFocus: false,
-  });
-
-  return {
-    tasks: data ?? [],
-    isLoading,
-    error,
-    mutate,
-  };
+  return useTaskHistory<ImageTask>(imageHistoryKey);
 }
 
 export function revalidateImageTasks() {
-  return globalMutate("/api/image-tasks");
+  return revalidateHistory(imageHistoryKey);
 }

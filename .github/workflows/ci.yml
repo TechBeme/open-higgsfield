@@ -17,6 +17,22 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: higgsfield_test
+          POSTGRES_USER: higgsfield_test
+          POSTGRES_PASSWORD: higgsfield_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U higgsfield_test -d higgsfield_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -31,11 +47,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=info
+
+      - name: Audit all dependencies
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends postgresql-client
+          fi
+
+      - name: Regression tests
+        run: npm run test
+        env:
+          REQUIRE_POSTGRES_TESTS: "1"
+          TEST_POSTGRES_HOST: 127.0.0.1
+          TEST_POSTGRES_PORT: "5432"
+          TEST_POSTGRES_DB: higgsfield_test
+          TEST_POSTGRES_USER: higgsfield_test
+          TEST_POSTGRES_PASSWORD: higgsfield_test
 
       - name: Build
         run: npm run build

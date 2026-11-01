@@ -98,7 +98,7 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - Capability-driven model catalog and provider-neutral generation contracts
 - Freepik API, Google Gen AI SDK, Vertex AI, and Vercel AI Gateway
 - Cloudinary handoff for workflows that require public reference-media URLs
-- PostgreSQL/Neon image history with a local filesystem fallback
+- PostgreSQL/Neon task history, or an explicit single-process local store
 
 ## Architecture
 
@@ -177,6 +177,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and start generating.
 
+Development binds to `127.0.0.1`. Credential-free development must remain local;
+use explicit credentials and an HTTPS origin before exposing another environment.
+
 ### Docker
 
 ```bash
@@ -184,18 +187,15 @@ cp .env.example .env.local
 docker compose up --build
 ```
 
-Docker stores generated files and task history in the `open-higgsfield-data` volume.
+Configure the production access and single-process profile from the [operator guide](docs/production.md) before starting Docker. It stores files and history in the `open-higgsfield-data` volume and publishes port 3000 on loopback for an HTTPS reverse proxy.
 
 ## Deploy on Vercel
 
-Use the **Deploy with Vercel** button at the top, then add credentials only for the providers you want enabled. Attach a custom domain after the first successful deployment.
+Production requires an operator credential, an HTTPS origin, migrated PostgreSQL task storage, explicitly public Cloudinary outputs and recurring execution. The included minute cron requires **Vercel Pro or Enterprise**. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
 
-Add `DATABASE_URL` to persist task history and generated images in PostgreSQL/Neon across Vercel cold starts and deployments. Temporary uploads, generated videos, and asynchronous workers still require durable object storage and queue infrastructure for full production resilience.
+This is one shared BYOK workspace: authenticated people share tasks and spending authority. There are no per-user ownership boundaries, application monetary budgets or global rate limits. Configure provider quotas/budgets and ingress controls before enabling work. Cloudinary media remains public by URL.
 
-> [!WARNING]
-> Open-Higgsfield does not currently include built-in authentication, rate limiting, or per-user spending limits. Protect public deployments connected to billable provider accounts.
-
-See [Deployment](docs/deployment.md) for production and persistence guidance.
+Follow the [production operator guide](docs/production.md) for configuration, migration, scheduler verification and rollback before deploying.
 
 ## Commands
 

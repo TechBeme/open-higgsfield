@@ -106,6 +106,11 @@
     "tasks": {
         "feedTitle": "Gerações",
         "taskCount": "tarefas",
+        "loadingHistory": "Carregando gerações...",
+        "historyError": "Não foi possível carregar as gerações. Suas tarefas existentes foram preservadas.",
+        "retryHistory": "Recarregar histórico",
+        "loadMore": "Carregar mais",
+        "recoveryRequired": "Precisa de atenção. Esta geração pode estar em andamento ou concluída. Confira o status antes de enviar novamente.",
         "empty": "Nenhuma geração ainda. Configure um modelo e escreva um prompt para começar.",
         "seeMore": "Ver mais",
         "seeLess": "Ver menos",
@@ -147,7 +152,22 @@
         "ERR_DOWNLOAD_FAILED": "Erro ao baixar o resultado",
         "ERR_INVALID_STATUS": "Resposta inválida da API",
         "ERR_UPLOAD": "Erro ao enviar arquivo",
-        "ERR_GENERIC": "Ocorreu um erro inesperado"
+        "ERR_GENERIC": "Ocorreu um erro inesperado",
+        "ERR_SUBMISSION_OUTCOME_UNKNOWN": "Não foi possível confirmar o envio. Não envie novamente. Confira o histórico e o painel do provedor; a geração pode já estar em andamento ou ter sido cobrada.",
+        "ERR_ASSET_STORAGE_INCOMPLETE": "O provedor retornou um resultado, mas ele ainda não foi salvo por completo. Não envie novamente. Confira a tarefa e contate o responsável pelo espaço.",
+        "ERR_GENERATION_DISABLED": "Novas gerações foram desativadas pelo responsável pelo espaço.",
+        "ERR_GENERATION_CONFIG": "O espaço precisa ser configurado antes de aceitar novas gerações.",
+        "ERR_ACCESS_CONFIG": "O acesso ao espaço não está configurado. Contate o responsável.",
+        "ERR_DEPLOYMENT_CONFIG": "A instalação ainda não está pronta para gerar.",
+        "ERR_SCHEDULER_CONFIG": "A recuperação de tarefas não está configurada. Contate o responsável pelo espaço.",
+        "ERR_UNAUTHORIZED": "Entre no espaço antes de continuar.",
+        "ERR_ORIGIN_FORBIDDEN": "Esta solicitação precisa partir do endereço configurado do espaço.",
+        "ERR_TASK_STORAGE_UNAVAILABLE": "O armazenamento de tarefas está indisponível. Esta solicitação não foi enviada ao provedor.",
+        "ERR_REQUEST_TOO_LARGE": "O envio completo deve ficar abaixo de 4 MiB, incluindo todos os anexos e campos. Use uma URL pública compatível para arquivos maiores.",
+        "ERR_FORM_LIMIT": "Há anexos ou campos demais, ou um campo é muito grande. Reduza a solicitação e tente novamente.",
+        "ERR_CONTENT_TYPE": "O formato da solicitação não é compatível.",
+        "ERR_INVALID_FORM_DATA": "Não foi possível ler o envio. Confira os anexos.",
+        "ERR_REQUEST_CANCELLED": "O envio foi interrompido antes de solicitar a geração ao provedor."
     },
     "validation": {
         "promptRequired": "O prompt é obrigatório",
@@ -166,6 +186,10 @@
         "imageLabel": "Imagem",
         "urlPlaceholder": "https://...",
         "dropSingleTitle": "Solte em {field}",
-        "dropSingleHint": "Arraste arquivos aqui para anexar neste campo"
+        "dropSingleHint": "Arraste arquivos aqui para anexar neste campo",
+        "submitting": "Enviando...",
+        "reviewRequired": "Verifique a tarefa",
+        "reviewedSubmission": "Já conferi o estado da tarefa",
+        "uploadLimit": "Anexos e campos: menos de 4 MiB no total. Use uma URL pública compatível para referências maiores."
     }
 }

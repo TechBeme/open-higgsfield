@@ -62,6 +62,10 @@ next-env.d.ts
 /.tmp-*
 *.tmp
 
+# Local review reports, proposals and acceptance artifacts
+/.local-review/
+/concepts_brief.md
+
 # local AI/editor instructions
 /.agents/
 /.codex/

@@ -22,6 +22,7 @@ import type { AttachmentItem } from "@/components/studio/AttachmentZone";
 import type { SizeUiResolution } from "@/types";
 import { buildGroupedDropTargets, slotsToDropDescriptors, type GroupedDropTarget } from "@/lib/attachment-drop-targets";
 import { remapSlotFilesOnModelSwitch, remapVideoAttachmentsOnModelSwitch } from "@/lib/attachment-remap";
+import { parseSubmissionResponse, unknownSubmission } from "@/lib/client-submission";
 
 import { VideoModelPill } from "@/components/command-bar/VideoModelPill";
 import { ImageModelPill } from "@/components/command-bar/ImageModelPill";
@@ -79,6 +80,10 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
 
     // ── Shared state ──
     const [apiError, setApiError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionNeedsReview, setSubmissionNeedsReview] = useState(false);
+    const submittingRef = useRef(false);
+    const reviewRequiredRef = useRef(false);
     const [isDragOverlayVisible, setIsDragOverlayVisible] = useState(false);
     const [activeDropTargetId, setActiveDropTargetId] = useState<string | null>(null);
 
@@ -432,45 +437,47 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
         })();
 
     const onSubmit = async (data: FormData) => {
+        // State updates are asynchronous; this also fences click and Enter in the same frame.
+        if (submittingRef.current || reviewRequiredRef.current) return;
+        submittingRef.current = true;
+        setIsSubmitting(true);
         setApiError(null);
-        if (mode === "video") {
+        const submittedMode = mode;
+        let outcome = unknownSubmission();
+        try {
             const body = new FormData();
-            body.append("model_id", videoModelId);
-            body.append("variant_id", videoVariantId);
             body.append("prompt", data.prompt);
-            body.append("settings", JSON.stringify(videoSettings));
-            for (const att of attachments) {
-                if (att.file) body.append(`file_${att.roleId}`, att.file);
-                else if (att.url) body.append(`url_${att.roleId}`, att.url);
+            if (submittedMode === "video") {
+                body.append("model_id", videoModelId);
+                body.append("variant_id", videoVariantId);
+                body.append("settings", JSON.stringify(videoSettings));
+                for (const att of attachments) {
+                    if (att.file) body.append(`file_${att.roleId}`, att.file);
+                    else if (att.url) body.append(`url_${att.roleId}`, att.url);
+                }
+            } else {
+                body.append("model_id", imageModelId);
+                body.append("size_aspect", sizeAspect);
+                body.append("size_resolution", sizeResolution);
+                body.append("field_values", JSON.stringify(imageFieldValues));
+                for (const [slotId, files] of Object.entries(slotFiles)) {
+                    files.forEach((file) => body.append(`slot_${slotId}`, file));
+                }
             }
-            fetch("/api/generate", { method: "POST", body })
-                .then(async (res) => {
-                    if (!res.ok) {
-                        const json = await res.json().catch(() => ({}));
-                        setApiError(json.error ?? "ERR_GENERIC");
-                    }
-                    revalidateVideoTasks();
-                })
-                .catch(() => setApiError("ERR_GENERIC"));
-        } else {
-            const body = new FormData();
-            body.append("model_id", imageModelId);
-            body.append("prompt", data.prompt);
-            body.append("size_aspect", sizeAspect);
-            body.append("size_resolution", sizeResolution);
-            body.append("field_values", JSON.stringify(imageFieldValues));
-            for (const [slotId, files] of Object.entries(slotFiles)) {
-                files.forEach((f) => body.append(`slot_${slotId}`, f));
+            const response = await fetch(submittedMode === "video" ? "/api/generate" : "/api/generate-image", { method: "POST", body });
+            outcome = await parseSubmissionResponse(response);
+        } catch {
+            outcome = unknownSubmission();
+        } finally {
+            reviewRequiredRef.current = outcome.needsReview;
+            setSubmissionNeedsReview(outcome.needsReview);
+            setApiError(outcome.error ?? null);
+            if (outcome.taskId || outcome.needsReview) {
+                if (submittedMode === "video") revalidateVideoTasks();
+                else revalidateImageTasks();
             }
-            fetch("/api/generate-image", { method: "POST", body })
-                .then(async (res) => {
-                    if (!res.ok) {
-                        const json = await res.json().catch(() => ({}));
-                        setApiError(json.error ?? "ERR_GENERIC");
-                    }
-                    revalidateImageTasks();
-                })
-                .catch(() => setApiError("ERR_GENERIC"));
+            submittingRef.current = false;
+            setIsSubmitting(false);
         }
     };
 
@@ -490,21 +497,27 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="pointer-events-auto fixed right-6 z-42 min-w-[240px] max-w-[360px] rounded-[18px] border border-white/[.08] text-[13px] leading-[1.5] mb-2"
-                        style={{ bottom: 170, padding: "14px 16px", background: "rgba(12,16,24,.96)", boxShadow: "0 28px 80px rgba(0,0,0,.42)" }}
+                        className="pointer-events-auto relative mx-auto z-42 min-w-[240px] max-w-[360px] rounded-[18px] border border-white/[.08] text-[13px] leading-[1.5] mb-3 sm:fixed sm:right-6 sm:bottom-[170px] sm:mb-2"
+                        style={{ padding: "14px 16px", background: "rgba(12,16,24,.96)", boxShadow: "0 28px 80px rgba(0,0,0,.42)" }}
                     >
-                        <div className="flex items-center gap-2 text-[#ffc4c4]" style={{ borderColor: "rgba(255,128,128,.22)" }}>
+                        <div role="alert" className="flex items-center gap-2 text-[#ffc4c4]" style={{ borderColor: "rgba(255,128,128,.22)" }}>
                             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                             <span className="flex-1">{tErrors.has(apiError as never) ? tErrors(apiError as never) : tErrors("ERR_GENERIC")}</span>
-                            <button onClick={() => setApiError(null)} className="font-bold hover:opacity-70">×</button>
+                            {!submissionNeedsReview && <button onClick={() => setApiError(null)} className="font-bold hover:opacity-70">×</button>}
                         </div>
+                        {submissionNeedsReview && (
+                            <button type="button" className="mt-3 rounded-lg border border-white/20 px-3 py-2 text-white hover:bg-white/10"
+                                onClick={() => { reviewRequiredRef.current = false; setSubmissionNeedsReview(false); setApiError(null); }}>
+                                {tCommand("reviewedSubmission")}
+                            </button>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Composer stage — matches Flask grid */}
             <form
-                onSubmit={handleSubmit(onSubmit)}
+                onSubmit={(event) => { void handleSubmit(onSubmit)(event); }}
                 className="pointer-events-auto mx-auto grid gap-3 items-stretch"
                 style={{ width: "min(70rem, 100%)", gridTemplateColumns: "64px minmax(0,1fr)" }}
             >
@@ -549,7 +562,7 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
 
                 {/* Composer card */}
                 <div
-                    className="rounded-[28px] border border-white/[.08] flex items-stretch gap-3"
+                    className="min-w-0 rounded-[28px] border border-white/[.08] flex flex-col items-stretch gap-3 sm:flex-row"
                     style={{
                         backdropFilter: "blur(26px)",
                         background: "radial-gradient(circle at 92% 82%, rgba(213,255,71,.07), transparent 18%), linear-gradient(90deg, rgba(12,12,12,.96), rgba(20,20,20,.92) 52%, rgba(24,24,24,.88))",
@@ -560,7 +573,7 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
                     {/* Content: prompt + pills */}
                     <div className="flex-1 min-w-0 flex flex-col justify-between">
                         {/* Main prompt area */}
-                        <div className="flex items-start gap-2">
+                        <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
                             {/* Plus / attach button */}
                             {mode === "video" && videoHasAttachments(videoModel) ? (
                                 <AttachmentButton
@@ -586,7 +599,7 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
 
                             {/* Image slot thumbnails */}
                             {mode === "image" && Object.values(slotFiles).some((f) => f.length > 0) && (
-                                <div className="flex items-center gap-[5px] flex-wrap shrink-0">
+                                <div className="flex max-w-full items-center gap-[5px] flex-wrap shrink-0">
                                     {Object.entries(slotFiles).flatMap(([slotId, files]) =>
                                         files.map((file, idx) => (
                                             <div key={`${slotId}-${idx}`} className="relative w-[50px] h-[50px] shrink-0">
@@ -611,7 +624,7 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
 
                             {/* Video attachment thumbnails */}
                             {mode === "video" && attachments.length > 0 && (
-                                <div className="flex items-center gap-[5px] flex-wrap shrink-0">
+                                <div className="flex max-w-full items-center gap-[5px] flex-wrap shrink-0">
                                     {attachments.map((att) => (
                                         <div key={att.id} className="relative w-[50px] h-[50px] shrink-0">
                                             {att.previewUrl ? (
@@ -636,7 +649,7 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
                             )}
 
                             {/* Prompt surface */}
-                            <div className="flex-1 min-w-0 min-h-8">
+                            <div className="flex-1 basis-full min-w-0 min-h-8 sm:basis-0">
                                 {isDragOverlayVisible && hasDropTargets ? (
                                     <div
                                         className="rounded-[14px] border border-dashed p-2.5"
@@ -707,10 +720,10 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
                                         value={prompt}
                                         onChange={(e) => { setValue("prompt", e.target.value); autoResize(); }}
                                         onKeyDown={handleKeyDown}
+                                        aria-label={mode === "video" ? t("video.prompt.label") : t("image.prompt.label")}
                                         placeholder={mode === "video" ? t("video.promptPlaceholder") : t("image.promptPlaceholder")}
-                                        className="w-full border-none bg-transparent resize-none outline-none text-[15px] font-normal min-h-8 py-1.5 box-border text-foreground leading-[1.3]"
+                                        className="w-full border-none bg-transparent resize-none outline-none text-base font-normal min-h-16 max-h-[20dvh] py-1.5 box-border text-foreground leading-[1.3] sm:text-[15px] sm:min-h-8 sm:max-h-[35dvh]"
                                         style={{
-                                            maxHeight: "35dvh",
                                             overflowY: "auto",
                                             overflowX: "hidden",
                                         }}
@@ -803,15 +816,18 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
                                 </>
                             )}
                         </div>
+                        {(attachments.some((attachment) => attachment.file) || Object.values(slotFiles).some((files) => files.length)) && (
+                            <p className="mt-2 text-[10px] text-muted-foreground">{tCommand("uploadLimit")}</p>
+                        )}
                     </div>{/* end content wrapper */}
 
                     {/* Generate button — flex end, large lime */}
                     <button
                         type="submit"
-                        className="shrink-0 self-center border-none rounded-[22px] font-bold cursor-pointer active:scale-95 transition-transform"
+                        disabled={isSubmitting || submissionNeedsReview}
+                        aria-busy={isSubmitting}
+                        className="w-full min-h-[60px] shrink-0 self-center border-none rounded-[22px] font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed sm:w-[146px] sm:min-h-[84px]"
                         style={{
-                            width: 146,
-                            minHeight: 84,
                             background: "linear-gradient(180deg, #d5ff47, #bcf122)",
                             color: "#0b1118",
                             fontFamily: "'Space Grotesk', system-ui, sans-serif",
@@ -820,7 +836,7 @@ export function CommandBar({ mode, onModeChange }: CommandBarProps) {
                             boxShadow: "0 20px 42px rgba(188,241,34,.18)",
                         }}
                     >
-                        <span>{tCommon("generate")}</span>
+                        <span>{isSubmitting ? tCommand("submitting") : submissionNeedsReview ? tCommand("reviewRequired") : tCommon("generate")}</span>
                         <small className="block mt-1 text-[10px] font-extrabold tracking-[.08em] uppercase" style={{ fontFamily: "'Manrope', sans-serif" }}>
                             {mode === "video" ? tCommon("video") : tCommon("image")}
                         </small>

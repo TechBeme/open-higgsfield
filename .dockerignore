@@ -9,3 +9,5 @@ tasks_history.json
 !.env.example
 *.log
 *.tsbuildinfo
+.local-review
+concepts_brief.md

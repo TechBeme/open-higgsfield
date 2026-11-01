@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslations } from "next-intl";
 import { IMAGE_CAPABILITIES } from "@/models/capabilities/image";
 import type { ImageTask } from "@/types";
+import { attachmentUrl } from "@/lib/download-url";
 
 interface ImageTaskCardProps {
   task: ImageTask;
@@ -139,29 +140,20 @@ export function ImageTaskCard({ task, onDelete, onReuse, onLightbox }: ImageTask
         <div className="px-4 pb-3 flex items-start gap-2">
           <AlertCircle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" />
           <p className="text-xs text-destructive">
-            {task.error_message ?? "Generation failed"}
+            {task.recovery_required ? t("recoveryRequired") : task.error_message ?? "Generation failed"}
           </p>
         </div>
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 px-4 pb-3">
-        {images.length > 0 && images.map((url, idx) =>
-          images.length === 1 ? (
-            <a key={idx} href={`/api/download/${task.task_id}?index=0`} download target="_blank" rel="noreferrer"
+      <div className="flex flex-wrap gap-2 px-4 pb-3">
+        {images.map((_url, idx) => (
+            <a key={idx} href={attachmentUrl(`/api/download/${task.task_id}?index=${idx}`)} download target="_blank" rel="noreferrer"
               className={buttonVariants({ variant: "outline", size: "sm" }) + " h-7 text-xs gap-1.5"}>
               <Download className="h-3 w-3" />
-              {t("downloadImage")}
+              {t("downloadImage")}{images.length > 1 ? ` ${idx + 1}` : ""}
             </a>
-          ) : null
-        )}
-        {images.length > 1 && (
-          <a href={`/api/download/${task.task_id}`} download
-            className={buttonVariants({ variant: "outline", size: "sm" }) + " h-7 text-xs gap-1.5"}>
-            <Download className="h-3 w-3" />
-            {t("downloadAll")}
-          </a>
-        )}
+        ))}
         <Button
           variant="ghost"
           size="sm"

@@ -18,8 +18,11 @@ interface TaskFeedProps {
 
 export function TaskFeed({ mode, onReuse }: TaskFeedProps) {
   const t = useTranslations("tasks");
-  const { tasks: videoTasks } = useVideoTasks();
-  const { tasks: imageTasks } = useImageTasks();
+  const videoHistory = useVideoTasks();
+  const imageHistory = useImageTasks();
+  const { tasks: videoTasks } = videoHistory;
+  const { tasks: imageTasks } = imageHistory;
+  const history = mode === "video" ? videoHistory : imageHistory;
 
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number; modelId?: string; prompt?: string } | null>(null);
 
@@ -44,7 +47,7 @@ export function TaskFeed({ mode, onReuse }: TaskFeedProps) {
     setLightbox((lb) => lb ? { ...lb, index: (lb.index - 1 + lb.images.length) % lb.images.length } : null), []);
 
   const tasks = mode === "video" ? videoTasks : imageTasks;
-  const isEmpty = tasks.length === 0;
+  const isEmpty = tasks.length === 0 && !history.isLoading && !history.error;
 
   return (
     <div className="flex flex-col h-full">
@@ -65,6 +68,11 @@ export function TaskFeed({ mode, onReuse }: TaskFeedProps) {
 
       {/* Tasks list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {history.isLoading && <p role="status">{t("loadingHistory")}</p>}
+        {history.error && <div role="alert" className="text-sm text-destructive">
+          <p>{t("historyError")}</p>
+          <button type="button" className="underline" onClick={() => void history.mutate().catch(() => undefined)}>{t("retryHistory")}</button>
+        </div>}
         <AnimatePresence mode="popLayout">
           {isEmpty && (
             <motion.div
@@ -100,6 +108,10 @@ export function TaskFeed({ mode, onReuse }: TaskFeedProps) {
               />
             ))}
         </AnimatePresence>
+        {history.hasMore && <button type="button" disabled={history.isLoadingMore || Boolean(history.error)}
+          onClick={() => void history.loadMore()} className="w-full rounded-lg border p-2 text-sm disabled:opacity-50">
+          {history.isLoadingMore ? t("loadingHistory") : t("loadMore")}
+        </button>}
       </div>
 
       {/* Lightbox */}

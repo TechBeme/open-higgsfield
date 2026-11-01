@@ -3,35 +3,56 @@ import { IMAGE_CAPABILITIES } from "@/models/capabilities/image";
 import { getImageAdapter } from "@/models/adapters/image";
 import { saveInputLocally, uploadToTmpfiles } from "@/lib/upload";
 import { submitGeneration } from "@/lib/generation-service";
-import { publicErrorMessage } from "@/lib/public-error";
+import { safeErrorCode } from "@/lib/task-runtime";
+import { inputFile, objectField, preprocessingFailure } from "@/lib/generation-input";
+import { guardWorkspaceRequest } from "@/lib/workspace-access";
+import { assertGenerationEnabled } from "@/lib/production-config";
+import { readGenerationForm, requestFailure } from "@/lib/request-limits";
 import type { CanonicalParams, CanonicalMediaInputs } from "@/models/canonical";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-export async function POST(req: NextRequest) {
-  const form = await req.formData();
+function rejection(error: string) {
+  return NextResponse.json({ error, accepted: false, recovery_required: false }, { status: 400 });
+}
 
+export async function POST(req: NextRequest) {
+  const denial = guardWorkspaceRequest(req);
+  if (denial) return denial;
+  const signal = AbortSignal.any([req.signal, AbortSignal.timeout(270_000)]);
+  let form: FormData;
+  try {
+    assertGenerationEnabled();
+    form = await readGenerationForm(req, { signal });
+  } catch (error) { return requestFailure(error); }
+
+  try { return await prepareGeneration(form, signal); }
+  catch (error) { return preprocessingFailure(error, signal); }
+}
+
+async function prepareGeneration(form: FormData, signal: AbortSignal) {
+  signal.throwIfAborted();
   // ── Model lookup ──────────────────────────────────────────────────────────
   const modelId = String(form.get("model_id") ?? "").trim();
   const caps = IMAGE_CAPABILITIES[modelId];
   if (!caps) {
-    return NextResponse.json({ error: `ERR_UNKNOWN_IMAGE_MODEL: ${modelId}` }, { status: 400 });
+    return rejection("ERR_UNKNOWN_IMAGE_MODEL");
   }
 
   const adapter = (caps.provider ?? "freepik") === "freepik" ? getImageAdapter(modelId) : undefined;
   if ((caps.provider ?? "freepik") === "freepik" && !adapter) {
-    return NextResponse.json({ error: `ERR_NO_ADAPTER: ${modelId}` }, { status: 400 });
+    return rejection("ERR_NO_ADAPTER");
   }
 
   // ── Build canonical params ────────────────────────────────────────────────
   const prompt = String(form.get("prompt") ?? "").trim();
   if (caps.prompt_required && !prompt) {
-    return NextResponse.json({ error: "ERR_PROMPT_REQUIRED" }, { status: 400 });
+    return rejection("ERR_PROMPT_REQUIRED");
   }
 
-  let fieldValues: Record<string, unknown> = {};
-  try { fieldValues = JSON.parse(String(form.get("field_values") ?? "{}")); } catch { }
+  if (prompt.length > (caps.prompt_max ?? 2500)) return rejection("ERR_PROMPT_TOO_LONG");
+  const fieldValues = objectField(form, "field_values", "ERR_INVALID_FIELD_VALUES");
 
   const params: CanonicalParams = {
     model_id: modelId,
@@ -53,6 +74,7 @@ export async function POST(req: NextRequest) {
   ];
 
   for (const slotId of allSlotIds) {
+    signal.throwIfAborted();
     const files: File[] = [];
     const formEntries = form.getAll(`slot_${slotId}`);
     for (const entry of formEntries) {
@@ -65,12 +87,12 @@ export async function POST(req: NextRequest) {
       // edit_variant slot (e.g. reference_images for Seedream)
       const converted: string[] = [];
       for (const file of files) {
-        const buf = Buffer.from(await file.arrayBuffer());
+        const buf = await inputFile(file, "image/jpeg", signal);
         const ext = file.name.split(".").pop() ? `.${file.name.split(".").pop()}` : ".jpg";
         const mimeType = file.type || "image/jpeg";
-        const localUrl = await saveInputLocally(buf, ext);
+        const localUrl = await saveInputLocally(buf, ext, { signal });
         slotLocalUrls[slotId] = [...(slotLocalUrls[slotId] ?? []), localUrl];
-        const remoteUrl = await uploadToTmpfiles(buf, `file${ext}`, mimeType);
+        const remoteUrl = await uploadToTmpfiles(buf, `file${ext}`, mimeType, { signal });
         converted.push(remoteUrl);
       }
       media.images = { ...media.images, [slotId]: converted.length === 1 ? converted[0] : converted as unknown as string };
@@ -79,12 +101,12 @@ export async function POST(req: NextRequest) {
 
     const converted: string[] = [];
     for (const file of files) {
-      const buf = Buffer.from(await file.arrayBuffer());
+      const buf = await inputFile(file, "image/jpeg", signal);
       const ext = file.name.split(".").pop() ? `.${file.name.split(".").pop()}` : ".jpg";
       const mimeType = file.type || "image/jpeg";
-      const localUrl = await saveInputLocally(buf, ext);
+      const localUrl = await saveInputLocally(buf, ext, { signal });
       slotLocalUrls[slotId] = [...(slotLocalUrls[slotId] ?? []), localUrl];
-      const remoteUrl = await uploadToTmpfiles(buf, `file${ext}`, mimeType);
+      const remoteUrl = await uploadToTmpfiles(buf, `file${ext}`, mimeType, { signal });
       converted.push(remoteUrl);
     }
 
@@ -94,13 +116,16 @@ export async function POST(req: NextRequest) {
   // Validate required slots
   for (const slot of caps.media_slots) {
     if (slot.required && (!media.images || !media.images[slot.id])) {
-      return NextResponse.json({ error: `ERR_SLOT_REQUIRED: ${slot.label}` }, { status: 400 });
+      return rejection("ERR_SLOT_REQUIRED");
     }
   }
 
+  signal.throwIfAborted();
+
   // ── Submit ────────────────────────────────────────────────────────────────
   try {
-    const taskId = await submitGeneration({
+    const result = await submitGeneration({
+      signal,
       mediaType: "image",
       modelId,
       capabilities: caps,
@@ -108,9 +133,10 @@ export async function POST(req: NextRequest) {
       media,
       reuseState: { fieldValues, slotLocalUrls },
     });
-    return NextResponse.json({ task_id: taskId });
+    const { httpStatus, ...body } = result;
+    return NextResponse.json(body, { status: httpStatus });
   } catch (err) {
-    const msg = publicErrorMessage(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const cancelled = signal.aborted || safeErrorCode(err) === "ERR_REQUEST_CANCELLED";
+    return NextResponse.json({ error: cancelled ? "ERR_REQUEST_CANCELLED" : "ERR_TASK_STORAGE_UNAVAILABLE", accepted: false, recovery_required: false }, { status: cancelled ? 408 : 503 });
   }
 }

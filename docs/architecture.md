@@ -43,7 +43,7 @@ Freepik has model-family-specific payload and endpoint differences. Those remain
 
 ## Storage
 
-When `DATABASE_URL` is configured, task history and generated images are persisted in PostgreSQL/Neon. Local development falls back to disk, and `OPEN_HIGGSFIELD_STORAGE_DIR` changes that storage root. Temporary uploads and generated videos still use the filesystem; Vercel defaults to ephemeral `/tmp/open-higgsfield` for those files.
+PostgreSQL/Neon stores task metadata and durable media references, not new image bytes. Database/serverless deployments require Cloudinary storage with explicit public-delivery acknowledgement; its CDN originals remain public even when the studio is protected. Local mode supports one process with a persistent disk at `OPEN_HIGGSFIELD_STORAGE_DIR`. Outputs use content-addressed names so stale workers cannot replace newer media. Legacy inline records remain readable within deployment payload limits. See [storage](storage.md) for configuration, limits and migration.
 
 ## Extension points
 

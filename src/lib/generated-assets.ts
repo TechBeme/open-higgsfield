@@ -1,59 +1,69 @@
-import type { AnyTask, ImageTask, VideoTask } from "@/types";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import type { AnyTask } from "@/types";
 import type { GeneratedAsset } from "@/providers/types";
-import { saveDownload } from "@/lib/upload";
-import { isDatabaseConfigured } from "@/lib/database";
+import { assertAssetId, cloudinaryConfiguration, saveDownload, uploadCloudinary } from "@/lib/upload";
+import { assertInputFileSize, detectMediaMime, fetchRemoteMedia, mediaExtension, mediaByteLimit,
+    transferSignal, type TransferOptions } from "@/lib/media-transfer";
 
-function extensionFor(mimeType?: string, url?: string): string {
-    const mime = mimeType?.toLowerCase() ?? "";
-    if (mime.includes("jpeg")) return ".jpg";
-    if (mime.includes("png")) return ".png";
-    if (mime.includes("webp")) return ".webp";
-    if (mime.includes("gif")) return ".gif";
-    if (mime.includes("webm")) return ".webm";
-    if (mime.includes("quicktime")) return ".mov";
-    if (mime.includes("mp4")) return ".mp4";
-    const match = url?.match(/\.(png|jpe?g|webp|gif|mp4|webm|mov)(?:\?|$)/i);
-    return match ? `.${match[1].toLowerCase().replace("jpeg", "jpg")}` : ".bin";
-}
-
-async function materializeAsset(asset: GeneratedAsset): Promise<{ data: Buffer; mimeType?: string; sourceUrl?: string }> {
-    if (asset.data) return { data: Buffer.from(asset.data), mimeType: asset.mimeType, sourceUrl: asset.url };
-    if (!asset.url) throw new Error("ERR_EMPTY_GENERATED_ASSET");
-    const response = await fetch(asset.url);
-    if (!response.ok) throw new Error(`ERR_DOWNLOAD_FAILED: ${response.status}`);
-    return {
-        data: Buffer.from(await response.arrayBuffer()),
-        mimeType: asset.mimeType ?? response.headers.get("content-type") ?? undefined,
-        sourceUrl: asset.url,
-    };
-}
-
-export async function attachGeneratedAssets(task: AnyTask, assets: GeneratedAsset[]): Promise<void> {
-    if (assets.length === 0) throw new Error("ERR_NO_GENERATED_ASSETS");
-
-    if (task.media_type === "image") {
-        const imageTask = task as ImageTask;
-        const paths: string[] = [];
-        const urls: string[] = [];
-        for (const [index, asset] of assets.entries()) {
-            const materialized = await materializeAsset(asset);
-            const ext = extensionFor(materialized.mimeType, materialized.sourceUrl);
-            paths.push(await saveDownload(task.task_id, `_${index}${ext}`, materialized.data));
-            if (isDatabaseConfigured()) {
-                const mimeType = materialized.mimeType ?? (ext === ".jpg" ? "image/jpeg" : `image/${ext.slice(1)}`);
-                urls.push(`data:${mimeType};base64,${materialized.data.toString("base64")}`);
-            }
+export function assertGeneratedStorageConfigured(): "local" | "cloudinary" {
+    const configured = process.env.ASSET_STORAGE_MODE;
+    const mode = configured ?? (process.env.NODE_ENV !== "production" && !process.env.DATABASE_URL && !process.env.VERCEL ? "local" : undefined);
+    if (mode !== "local" && mode !== "cloudinary") throw new Error("ERR_ASSET_STORAGE_NOT_CONFIGURED");
+    if (mode === "local") {
+        if (process.env.DATABASE_URL || process.env.VERCEL) throw new Error("ERR_DURABLE_ASSET_STORAGE_REQUIRED");
+        if (process.env.NODE_ENV === "production" && (!process.env.OPEN_HIGGSFIELD_STORAGE_DIR || !path.isAbsolute(process.env.OPEN_HIGGSFIELD_STORAGE_DIR))) {
+            throw new Error("ERR_PERSISTENT_STORAGE_REQUIRED");
         }
-        imageTask.result_paths = paths;
-        imageTask.result_urls = urls.length > 0
-            ? urls
-            : paths.map((_, index) => `/api/download/${task.task_id}?index=${index}`);
-        return;
+    } else {
+        if (process.env.ASSET_DELIVERY_MODE !== "public") throw new Error("ERR_PUBLIC_ASSET_DELIVERY_ACK_REQUIRED");
+        cloudinaryConfiguration();
     }
+    return mode;
+}
 
-    const videoTask = task as VideoTask;
-    const first = await materializeAsset(assets[0]);
-    const ext = extensionFor(first.mimeType, first.sourceUrl);
-    videoTask.video_path = await saveDownload(task.task_id, ext === ".bin" ? ".mp4" : ext, first.data);
-    videoTask.video_urls = assets.flatMap((asset) => asset.url ? [asset.url] : []);
+async function materializeAsset(asset: GeneratedAsset, mediaType: "image" | "video", signal: AbortSignal) {
+    signal.throwIfAborted();
+    let data: Buffer;
+    let declared = asset.mimeType;
+    if (asset.data) {
+        assertInputFileSize(asset.data.byteLength, `${mediaType}/`);
+        data = Buffer.from(asset.data);
+    } else {
+        if (!asset.url) throw new Error("ERR_EMPTY_GENERATED_ASSET");
+        const fetched = await fetchRemoteMedia(asset.url, { signal, maxBytes: mediaByteLimit(`${mediaType}/`) });
+        data = fetched.data;
+        declared ??= fetched.mimeType;
+    }
+    const mimeType = detectMediaMime(data, declared);
+    if (!mimeType.startsWith(`${mediaType}/`)) throw new Error("ERR_UNSUPPORTED_MEDIA_TYPE");
+    assertInputFileSize(data.length, mimeType);
+    return { data, mimeType };
+}
+
+export async function attachGeneratedAssets(task: AnyTask, assets: GeneratedAsset[], options: TransferOptions = {}): Promise<void> {
+    assertAssetId(task.task_id);
+    const mode = assertGeneratedStorageConfigured();
+    if (!assets.length || assets.length > 16 || (task.media_type === "video" && assets.length !== 1)) throw new Error("ERR_INVALID_GENERATED_ASSET_COUNT");
+    const signal = transferSignal(options.signal);
+    const paths: string[] = [];
+    const urls: string[] = [];
+    for (const [index, asset] of assets.entries()) {
+        const { data, mimeType } = await materializeAsset(asset, task.media_type, signal);
+        if (mode === "cloudinary") {
+            const hash = createHash("sha256").update(data).digest("hex");
+            urls.push(await uploadCloudinary(data, `open-higgsfield/generated/${task.task_id}/${index}_${hash}`, mimeType, { signal }));
+        } else {
+            paths.push(await saveDownload(task.task_id, `_${index}${mediaExtension(mimeType)}`, data, { signal }));
+            urls.push(`/api/download/${task.task_id}${task.media_type === "image" ? `?index=${index}` : "?inline=1"}`);
+        }
+    }
+    signal.throwIfAborted();
+    if (task.media_type === "image") {
+        task.result_paths = paths;
+        task.result_urls = urls;
+    } else {
+        task.video_path = paths[0];
+        task.video_urls = urls;
+    }
 }

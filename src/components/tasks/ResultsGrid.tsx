@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Inbox, Download, Trash2, Clock, AlertCircle, Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -9,7 +9,9 @@ import { VIDEO_CAPABILITIES } from "@/models/capabilities/video";
 import { Lightbox } from "@/components/tasks/Lightbox";
 import { useVideoTasks, revalidateVideoTasks } from "@/hooks/useVideoTasks";
 import { useImageTasks, revalidateImageTasks } from "@/hooks/useImageTasks";
-import type { VideoTask, ImageTask, TaskEvent } from "@/types";
+import type { VideoTask, ImageTask } from "@/types";
+import { useTaskRefresh } from "@/hooks/useTaskRefresh";
+import { attachmentUrl } from "@/lib/download-url";
 
 interface ResultsGridProps {
     mode: "video" | "image";
@@ -37,8 +39,11 @@ function formatFailureMessage(rawMessage: string | undefined, status: string | u
 
 export function ResultsGrid({ mode }: ResultsGridProps) {
     const t = useTranslations("tasks");
-    const { tasks: videoTasks } = useVideoTasks();
-    const { tasks: imageTasks } = useImageTasks();
+    const videoHistory = useVideoTasks();
+    const imageHistory = useImageTasks();
+    const { tasks: videoTasks } = videoHistory;
+    const { tasks: imageTasks } = imageHistory;
+    const history = mode === "video" ? videoHistory : imageHistory;
     const [lightbox, setLightbox] = useState<{ images: string[]; index: number; modelId?: string; prompt?: string; mediaType?: "image" | "video" } | null>(null);
 
     const handleDeleteVideo = useCallback(async (id: string) => {
@@ -60,10 +65,10 @@ export function ResultsGrid({ mode }: ResultsGridProps) {
         return (videoTasks as VideoTask[])
             .filter((t) => {
                 const s = t.status ?? t.freepik_status ?? "CREATED";
-                return s === "COMPLETED" && (t.video_path || (t.video_urls && t.video_urls.length > 0));
+                return s === "COMPLETED" && (t.has_download || (t.video_urls && t.video_urls.length > 0));
             })
             .map((t) => ({
-                url: t.video_path ? `/api/download/${t.task_id}?inline=1` : t.video_urls![0],
+                url: t.has_download ? `/api/download/${t.task_id}?inline=1` : t.video_urls![0],
                 modelLabel: VIDEO_CAPABILITIES[t.model_id]?.label ?? t.model_id,
                 prompt: t.prompt,
             }));
@@ -83,10 +88,15 @@ export function ResultsGrid({ mode }: ResultsGridProps) {
     }, [allVideoItems]);
 
     const tasks = mode === "video" ? videoTasks : imageTasks;
-    const isEmpty = tasks.length === 0;
+    const isEmpty = tasks.length === 0 && !history.isLoading && !history.error;
 
     return (
         <div className="h-full overflow-y-auto" style={{ paddingBottom: 296 }}>
+            {history.isLoading && <p role="status" className="p-5 text-sm text-muted-foreground">{t("loadingHistory")}</p>}
+            {history.error && <div role="alert" className="p-5 text-sm text-destructive">
+                <p>{t("historyError")}</p>
+                <button type="button" className="mt-2 underline" onClick={() => void history.mutate().catch(() => undefined)}>{t("retryHistory")}</button>
+            </div>}
             {isEmpty ? (
                 <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-4">
                     <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "rgba(255,255,255,.04)" }}>
@@ -131,6 +141,12 @@ export function ResultsGrid({ mode }: ResultsGridProps) {
                 </div>
             )}
 
+            {history.hasMore && <div className="flex justify-center px-5 py-6">
+                <button type="button" disabled={history.isLoadingMore || Boolean(history.error)}
+                    onClick={() => void history.loadMore()} className="rounded-lg border border-white/15 px-4 py-2 text-sm disabled:opacity-50">
+                    {history.isLoadingMore ? t("loadingHistory") : t("loadMore")}
+                </button>
+            </div>}
             {lightbox && (
                 <Lightbox
                     images={lightbox.images}
@@ -174,51 +190,14 @@ function VideoResultCard({
     onLightbox: (urls: string[], index: number, modelId?: string, prompt?: string) => void;
     t: ReturnType<typeof useTranslations<"tasks">>;
 }) {
-    const [status, setStatus] = useState(task.status ?? task.freepik_status ?? "CREATED");
-    const [videoUrls, setVideoUrls] = useState<string[]>(task.video_urls ?? []);
-    const [hasDownload, setHasDownload] = useState(!!task.video_path);
-    const [errorMsg, setErrorMsg] = useState(task.error_message ?? "");
-    const [elapsed, setElapsed] = useState(0);
+    const status = task.status ?? task.freepik_status ?? "CREATED";
+    const videoUrls = task.video_urls ?? [];
+    const hasDownload = Boolean(task.has_download);
+    const errorMsg = task.recovery_required ? t("recoveryRequired") : task.error_message ?? "";
+    const elapsed = useTaskRefresh(task);
     const [muted, setMuted] = useState(true);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const isDone = useRef(["COMPLETED", "FAILED", "ERROR", "CANCELLED"].includes(task.status ?? task.freepik_status ?? ""));
     const modelLabel = VIDEO_CAPABILITIES[task.model_id]?.label ?? task.model_id;
-
-    useEffect(() => {
-        if (isDone.current) return;
-        const es = new EventSource(`/api/events/${task.task_id}`);
-        const timer: ReturnType<typeof setInterval> = setInterval(() => {
-            if (!isDone.current) setElapsed((prev) => prev + 1);
-        }, 1000);
-
-        es.onmessage = (e) => {
-            const event: TaskEvent = JSON.parse(e.data);
-            if (event.type === "status") {
-                setStatus(event.status ?? "IN_PROGRESS");
-                if (event.elapsed !== undefined) setElapsed(event.elapsed);
-            } else if (event.type === "completed") {
-                setStatus("COMPLETED");
-                if (event.video_urls) setVideoUrls(event.video_urls);
-                if (event.has_download) setHasDownload(true);
-                isDone.current = true;
-                es.close();
-                if (timer) clearInterval(timer);
-            } else if (event.type === "failed" || event.type === "error" || event.type === "timeout") {
-                setStatus(event.status ?? "FAILED");
-                setErrorMsg(event.message ?? "Generation failed");
-                isDone.current = true;
-                es.close();
-                if (timer) clearInterval(timer);
-            }
-        };
-
-        es.onerror = () => { };
-
-        return () => {
-            es.close();
-            clearInterval(timer);
-        };
-    }, [task.task_id]);
 
     const isProcessing = ["CREATED", "IN_PROGRESS"].includes(status);
     const isCompleted = status === "COMPLETED";
@@ -307,7 +286,7 @@ function VideoResultCard({
                             </button>
                         )}
                         {isCompleted && hasDownload && (
-                            <a href={`/api/download/${task.task_id}`} download onClick={(e) => e.stopPropagation()} className="w-[34px] h-[34px] rounded-full grid place-items-center text-white" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>
+                            <a href={attachmentUrl(`/api/download/${task.task_id}`)} aria-label={t("downloadVideo")} download onClick={(e) => e.stopPropagation()} className="w-[34px] h-[34px] rounded-full grid place-items-center text-white" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>
                                 <Download className="h-3.5 w-3.5" />
                             </a>
                         )}
@@ -335,37 +314,11 @@ function ImageResultCard({
     onLightbox: (urls: string[], index: number, modelId?: string, prompt?: string) => void;
     t: ReturnType<typeof useTranslations<"tasks">>;
 }) {
-    const [status, setStatus] = useState(task.status ?? task.freepik_status ?? "CREATED");
-    const [images, setImages] = useState<string[]>(task.result_urls ?? []);
-    const [errorMsg, setErrorMsg] = useState(task.error_message ?? "");
-    const isDone = useRef(["COMPLETED", "FAILED", "ERROR", "CANCELLED"].includes(task.status ?? task.freepik_status ?? ""));
+    const status = task.status ?? task.freepik_status ?? "CREATED";
+    const images = task.result_urls ?? [];
+    const errorMsg = task.recovery_required ? t("recoveryRequired") : task.error_message ?? "";
     const modelLabel = IMAGE_CAPABILITIES[task.model_id]?.label ?? task.model_id;
-
-    useEffect(() => {
-        if (isDone.current) return;
-        const es = new EventSource(`/api/events/${task.task_id}`);
-
-        es.onmessage = (e) => {
-            const event: TaskEvent = JSON.parse(e.data);
-            if (event.type === "status") {
-                setStatus(event.status ?? "IN_PROGRESS");
-            } else if (event.type === "completed") {
-                setStatus("COMPLETED");
-                if (event.result_urls) setImages(event.result_urls);
-                isDone.current = true;
-                es.close();
-            } else if (event.type === "failed" || event.type === "error" || event.type === "timeout") {
-                setStatus(event.status ?? "FAILED");
-                if (event.message) setErrorMsg(event.message);
-                isDone.current = true;
-                es.close();
-            }
-        };
-
-        es.onerror = () => { };
-
-        return () => { es.close(); };
-    }, [task.task_id]);
+    useTaskRefresh(task);
 
     const isProcessing = ["CREATED", "IN_PROGRESS"].includes(status);
     const isFailed = ["FAILED", "ERROR", "CANCELLED"].includes(status);
@@ -455,7 +408,7 @@ function ImageResultCard({
                     >
                         <div className="flex items-start justify-end gap-1 min-w-0">
                             <div className="flex items-center gap-1.5 shrink-0">
-                                <a href={`/api/download/${task.task_id}?index=${idx}`} download onClick={(e) => e.stopPropagation()} className="w-[34px] h-[34px] rounded-full grid place-items-center text-white" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>
+                                <a href={attachmentUrl(`/api/download/${task.task_id}?index=${idx}`)} aria-label={t("downloadImage")} download onClick={(e) => e.stopPropagation()} className="w-[34px] h-[34px] rounded-full grid place-items-center text-white" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>
                                     <Download className="h-3.5 w-3.5" />
                                 </a>
                                 <button onClick={(e) => { e.stopPropagation(); onDelete(task.task_id); }} className="w-[34px] h-[34px] rounded-full grid place-items-center text-white hover:text-red-400" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>

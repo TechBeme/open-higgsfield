@@ -272,6 +272,7 @@ export const EXTERNAL_VIDEO_CAPABILITIES: Record<string, ModelCapabilities> = {
         label: "Veo 3.1",
         provider: "google-ai-studio",
         providerModelId: "veo-3.1-generate-preview",
+        generateAudio: false,
         group: "Google AI Studio",
         family: "Veo 3.1",
         supportsEndFrame: true,

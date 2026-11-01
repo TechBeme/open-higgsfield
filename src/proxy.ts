@@ -1,9 +1,21 @@
 import createMiddleware from "next-intl/middleware";
+import { NextRequest, NextResponse } from "next/server";
 import { routing } from "@/i18n/routing";
+import { applyWorkspaceHeaders, guardSchedulerRequest, guardWorkspaceRequest } from "@/lib/workspace-access";
 
-export default createMiddleware(routing);
+const localize = createMiddleware(routing);
+
+export default function proxy(request: NextRequest) {
+    const pathname = request.nextUrl.pathname;
+    if (pathname === "/api/health") return NextResponse.next();
+    const denial = pathname === "/api/internal/process-tasks"
+        ? guardSchedulerRequest(request) : guardWorkspaceRequest(request);
+    if (denial) return denial;
+    const response = pathname.startsWith("/api/") || pathname.startsWith("/_next/") || pathname.includes(".")
+        ? NextResponse.next() : localize(request);
+    return applyWorkspaceHeaders(response);
+}
 
 export const config = {
-    // Match all routes except API routes, static files, and Next.js internals
-    matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+    matcher: ["/((?!_next/static/|_next/webpack-hmr$).*)"],
 };
