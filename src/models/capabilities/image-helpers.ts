@@ -2,7 +2,7 @@
  * Frontend helper functions for image capabilities.
  * Derive UI-friendly data shapes from ImageModelCapability.
  */
-import type { ImageModelCapability } from "./image";
+import type { ImageModelCapability } from "@/models/capabilities/types";
 import type { MediaSlotCapability } from "./types";
 
 /** Edit variant definition for image models */

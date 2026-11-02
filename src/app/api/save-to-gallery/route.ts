@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { getTask, initStore } from "@/lib/task-store";
-import { assertAssetId } from "@/lib/upload";
-import { assetErrorResponse, assetIndex, taskAssetCount, taskAssetSource, PRIVATE_MEDIA_HEADERS } from "@/lib/asset-source";
-import { guardWorkspaceRequest } from "@/lib/workspace-access";
-import { readBoundedJson, requestFailure } from "@/lib/request-limits";
+import { getTask, initStore } from "@/server/tasks/store";
+import { assertAssetId } from "@/server/media/storage";
+import { assetErrorResponse, assetIndex, taskAssetCount, taskAssetSource, PRIVATE_MEDIA_HEADERS } from "@/server/media/asset-source";
+import { guardWorkspaceRequest } from "@/server/security/workspace-access";
+import { readBoundedJson, requestFailure } from "@/server/http/request-limits";
 
 export async function POST(req: NextRequest) {
     const denial = guardWorkspaceRequest(req);

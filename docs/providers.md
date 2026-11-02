@@ -2,13 +2,13 @@
 
 Only the provider selected for a generation needs to be configured. All credentials are read on the server.
 
-## Freepik
+## Magnific
 
 ```dotenv
-FREEPIK_API_KEY=
+MAGNIFIC_API_KEY=
 ```
 
-Open-Higgsfield includes Freepik image families such as Flux, Seedream and Z-Image, plus video families such as Kling, Runway, Wan, MiniMax, Seedance, PixVerse, LTX and OmniHuman.
+Current schema-backed image/video models use only `https://api.magnific.com` and `x-magnific-api-key`. The former Freepik provider, credentials and model catalog are no longer supported. Saved outputs remain readable; unfinished legacy jobs cannot be polled through Magnific.
 
 ## Google AI Studio
 
@@ -44,6 +44,8 @@ AI_GATEWAY_API_KEY=
 
 The current catalog includes Google, Black Forest Labs, Recraft, OpenAI, Alibaba Wan and KlingAI models exposed through the gateway.
 
+Model synchronization uses the public `GET https://ai-gateway.vercel.sh/v1/models` endpoint and requires no key. Generation still requires a configured connection. Google AI Studio model synchronization requires an enabled API key. Reloading the page only reads the saved catalog; it does not contact providers.
+
 ## ToAPIs
 
 ```dotenv
@@ -56,16 +58,16 @@ Credentials stay on the server. ToAPIs is additive and needs no provider-specifi
 database migration; production task persistence still requires the separate task
 lifecycle migration.
 
-| Models | Enabled controls |
-| --- | --- |
-| `gpt-image-2`, `gpt-image-2.5-flare` | Text-to-image, one result, 16:9/1:1/9:16, 1K/2K/4K. No image editing or reference inputs. Flare uses fixed high quality. |
-| `seedance-2`, `seedance-2-fast`, `seedance-2-mini` | One required first frame, four seconds, 480p/720p, 16:9/1:1/9:16, no generated audio. |
-| `seedance-2-5` | One required first frame, four seconds, 480p/720p, **adaptive** ratio determined by the input frame, no generated audio. |
+The current registry covers the documented image/video/action contracts, including
+GPT Image 2.5, Seedance 2/2.5, Kling, Veo, Wan, Vidu, Grok, Sora, Gemini
+Omni and Midjourney actions. The complete model and parameter matrix is maintained
+in [`docs/toapis-models.md`](toapis-models.md) and verified by
+`scripts/verify-toapis-models.mjs`.
 
 First-frame URLs must be public HTTPS without embedded credentials and at most
 2048 bytes. Output URLs are temporary; the application materializes outputs into
-its configured asset storage. The subset deliberately excludes VIP image models,
-additional references, editing, extension, webhook callbacks and audio inputs.
+its configured asset storage. Webhook, callback and credential fields remain
+server-owned even where the upstream documentation exposes them.
 
 Current official contracts: [image generation](https://docs.toapis.com/docs/en/api-reference/images/gpt-image-2/generation),
 [Flare](https://docs.toapis.com/docs/en/api-reference/images/gpt-image-2.5/generation),
@@ -116,15 +118,16 @@ provider adapter and credential for existing tasks. Removing those with pending
 jobs pauses recovery and requires operator reconciliation. Do not run an old
 whole-snapshot task writer against the migrated task schema.
 
-Freepik's current official documentation redirects to Magnific branding and a
-new origin/header. This release preserves the existing Freepik API origin,
-header and environment variable; account migration and live compatibility have
-not been verified. Provider tests use synthetic requests and do not establish
-live account access, output quality, prices, refunds or settled charges.
+Provider tests use synthetic requests and do not establish live account access,
+output quality, prices, refunds or settled charges.
 
 ## Reference media uploads
 
 Some providers require a public URL for asynchronous image/video inputs. Open-Higgsfield uses Cloudinary for this handoff.
+
+The multipart request guard is 4 MiB. References larger than that must be
+provided through a validated public HTTPS URL; the provider-specific byte limits
+shown in each catalog do not raise this application transport ceiling.
 
 ```dotenv
 CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
@@ -136,14 +139,39 @@ You can alternatively configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` an
 
 If an existing provider already supports the model's API shape:
 
-1. Add its capability entry to `src/models/capabilities/image.ts`, `video.ts` or `external.ts`.
+1. Add its capability entry to `src/server/catalog/image.ts`, `video.ts` or `external.ts`.
 2. Set `provider`, `provider_model_id` and `provider_mode` when needed.
 3. Define every supported control and media slot.
 4. Verify the model appears in `/api/image-models` or `/api/models`.
 5. Run `npm run check`.
 
-Freepik models that need a new payload shape also require a model-family adapter in `src/models/adapters/`.
+Magnific models require a reviewed schema contract in `src/server/catalog/magnific.ts`.
 
 ## Adding a provider
 
-Implement the `GenerationProvider` interface from `src/providers/types.ts`, register it in `src/providers/registry.ts`, and add its credential documentation to `.env.example`.
+Implement the `GenerationProvider` interface from `src/providers/types.ts`, register it in `src/server/providers/registry.ts`, and add its credential documentation to `.env.example`.
+
+## Magnific current catalog
+
+The current official Freepik documentation redirects to Magnific. New image/video contracts use `https://api.magnific.com` and `x-magnific-api-key`; set `MAGNIFIC_API_KEY`. The legacy Freepik API is not used. The generated catalog is sourced from the official OpenAPI document at `https://storage.googleapis.com/fc-freepik-pro-rev1-eu-api-specs/magnific-api-v1-openapi.yaml` (refreshed 2026-11-01). The application excludes non-image/video products such as training, classifier, prompt utilities, music and speech.
+## Runtime provider configuration
+
+Each deployment has one operator configuration. Open `/en/settings` (or the
+configured locale) to add one or more connections for a provider, choose a
+priority, enable or disable models, and save a custom capability contract.
+Connections are stored server-side. Set `PROVIDER_CONFIG_ENCRYPTION_KEY` to a
+stable 32-character-or-longer secret before saving a connection; the browser
+never receives the API secret. Existing `.env` keys remain a read-only fallback.
+When PostgreSQL is enabled, apply `migrations/0002_provider_runtime_catalog.sql`
+before opening the settings page. File mode uses the private
+`provider-runtime-config.json` file under the configured storage directory.
+Multiple enabled connections at the lowest priority are selected round-robin;
+an explicitly unhealthy connection is skipped when another healthy connection
+exists. The connection ID is pinned to the task for polling and recovery.
+
+The model catalog API exposes only enabled models to the generation UI. Sync
+stores provider model IDs as unverified candidates; it does not guess their
+media capabilities or turn them on. Custom models are saved disabled and
+marked unverified. The provider adapter still owns the upstream endpoint,
+authentication and parameter translation, so a custom catalog entry cannot
+turn the application into an arbitrary proxy.

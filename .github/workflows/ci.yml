@@ -16,7 +16,7 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       NEXT_TELEMETRY_DISABLED: "1"
     services:
@@ -75,3 +75,21 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install test browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Browser regressions
+        run: npm run test:e2e
+        env:
+          E2E_PRODUCTION: "1"
+
+      - name: Upload browser failures
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore

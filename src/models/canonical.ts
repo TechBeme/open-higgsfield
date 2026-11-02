@@ -24,6 +24,8 @@ export interface CanonicalParams {
 }
 
 export interface CanonicalMediaInputs {
+    /** Complete ordered media references by semantic slot, including video/audio. */
+    slots?: Record<string, string[]>;
     /** Image attachments keyed by role/slot id → uploaded URL */
     images?: Record<string, string>;
     /** Video attachment URL */

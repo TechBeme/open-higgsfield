@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { getPublicTask } from "@/lib/task-store";
-import { taskEvent } from "@/lib/task-record";
-import { guardWorkspaceRequest } from "@/lib/workspace-access";
+import { getPublicTask } from "@/server/tasks/store";
+import { taskEvent } from "@/server/tasks/record";
+import { guardWorkspaceRequest } from "@/server/security/workspace-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ task
     const denial = guardWorkspaceRequest(req);
     if (denial) return denial;
     const { taskId } = await params;
-    let first;
+    let first: Awaited<ReturnType<typeof getPublicTask>>;
     try { first = await getPublicTask(taskId); }
     catch { return Response.json({ error: "ERR_TASK_STORAGE_UNAVAILABLE" }, { status: 503 }); }
     if (!first) return Response.json({ error: "ERR_TASK_NOT_FOUND" }, { status: 404 });

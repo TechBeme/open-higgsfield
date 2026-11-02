@@ -1,5 +1,6 @@
-import { StudioShell } from "@/components/studio/StudioShell";
+import { Suspense } from "react";
+import { StudioShell } from "@/features/studio/components/StudioShell";
 
 export default function StudioPage() {
-    return <StudioShell />;
+    return <Suspense fallback={null}><StudioShell /></Suspense>;
 }

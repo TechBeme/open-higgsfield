@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { assetErrorResponse, uploadedAssetResponse } from "@/lib/asset-source";
-import { guardWorkspaceRequest } from "@/lib/workspace-access";
+import { assetErrorResponse, uploadedAssetResponse } from "@/server/media/asset-source";
+import { guardWorkspaceRequest } from "@/server/security/workspace-access";
 
 export const runtime = "nodejs";
 

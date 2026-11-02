@@ -5,7 +5,7 @@
 
   **La alternativa open source y multiproveedor a Higgsfield para generar imágenes y videos con IA.**
 
-  Genera con modelos de Freepik, Gemini, Google Vertex AI y Vercel AI Gateway desde un único estudio creativo.
+  Genera con modelos de Magnific, Google AI Studio, Google Vertex AI, Vercel AI Gateway y ToAPIs desde un único estudio creativo.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Demo en vivo</strong></a>
@@ -34,14 +34,14 @@
   </p>
 </div>
 
-![Estudio de generación de imágenes y videos con IA de Open-Higgsfield](docs/images/open-higgsfield-cover.png)
+![Estudio de Open-Higgsfield en español](docs/images/open-higgsfield-studio-es.png)
 
 ## ¿Por qué Open-Higgsfield?
 
 Los modelos de medios generativos están repartidos entre proveedores, paneles y controles incompatibles. Open-Higgsfield los reúne en un único espacio visual:
 
 - **Genera imágenes y videos en el mismo estudio** sin cambiar de producto.
-- **Elige entre 40 modelos seleccionados** de Freepik, Google AI Studio, Vertex AI y Vercel AI Gateway.
+- **Elige modelos de imagen y vídeo** de Magnific, Google AI Studio, Vertex AI, Vercel AI Gateway y ToAPIs.
 - **Usa los controles correctos para cada modelo**: aspecto, resolución, duración, seed, CFG, seguridad y audio.
 - **Trabaja naturalmente con referencias** mediante image-to-image, image-to-video, fotograma inicial/final, video y audio.
 - **Cambia de proveedor sin reaprender la interfaz** con tareas, progreso, errores y resultados normalizados.
@@ -49,22 +49,43 @@ Los modelos de medios generativos están repartidos entre proveedores, paneles y
 
 ## Capturas de pantalla
 
-| Descubrimiento de modelos | Controles adaptativos |
+### Gestión de proveedores
+
+Conecta tus cuentas, activa los modelos que quieres usar y administra varias claves de API desde un solo lugar. Solo los modelos de proveedores conectados aparecen en el Estudio.
+
+![Gestión de proveedores de Open-Higgsfield en español](docs/images/open-higgsfield-providers-es.png)
+
+### Conexiones y selección de modelos
+
+Cada proveedor tiene sus propias conexiones, prioridades y ajustes de visibilidad de modelos. En el Estudio, busca por nombre o ID del modelo y filtra por proveedor.
+
+| Configuración del proveedor | Selector de modelos con búsqueda |
 | --- | --- |
-| ![Selector de modelos de Open-Higgsfield](docs/images/open-higgsfield-models.png) | ![Controles avanzados de Open-Higgsfield](docs/images/open-higgsfield-controls.png) |
+| ![Conexiones de Google AI Studio y visibilidad de modelos](docs/images/open-higgsfield-provider-detail-es.png) | ![Selector de modelos del Estudio en español](docs/images/open-higgsfield-models-es.png) |
 
-### Espacio unificado de generación
+### Estudio en escritorio y móvil
 
-![Espacio de generación de Open-Higgsfield con una galería de imágenes de demostración](docs/images/open-higgsfield-workspace.png)
+El mismo espacio permite generar imágenes y videos, con controles derivados de las capacidades de cada modelo. Antes de conectar un proveedor, la generación permanece desactivada y la acción de configuración está visible.
+
+<p align="center">
+  <img src="docs/images/open-higgsfield-studio-mobile-es.png" alt="Estudio de Open-Higgsfield en móvil en español" width="320" />
+</p>
+
+Capturas realizadas con Playwright sobre el build de producción en un espacio aislado. Las conexiones y el prompt son datos de demostración; no se usaron claves reales, medios privados ni generaciones de pago.
 
 ## Proveedores compatibles
 
-| Proveedor | Imágenes | Videos | Autenticación |
+Conecta un proveedor desde **Proveedores** o configura sus credenciales mediante variables de entorno. El catálogo integrado contiene las siguientes entradas de imagen y video:
+
+| Proveedor | Imágenes | Videos | Credenciales de entorno |
 | --- | ---: | ---: | --- |
-| Freepik | 7 | 16 | `FREEPIK_API_KEY` |
-| Google AI Studio | 3 | 1 | `GEMINI_API_KEY` |
-| Google Vertex AI | 2 | 1 | Credenciales de Google Cloud |
-| Vercel AI Gateway | 5 | 5 | `AI_GATEWAY_API_KEY` |
+| Magnific | 50 | 117 | `MAGNIFIC_API_KEY` |
+| Google AI Studio | 5 | 1 | `GEMINI_API_KEY` |
+| Google Vertex AI | 4 | 4 | Credenciales de Google Cloud |
+| Vercel AI Gateway | 45 | 39 | `AI_GATEWAY_API_KEY` |
+| ToAPIs | 51 | 51 | `TOAPIS_API_KEY` |
+
+Recuentos verificados en `/api/catalog` el 2 de noviembre de 2026. Las entradas incluyen variantes de uso, no solo modelos distintos del proveedor. Solo los modelos habilitados de proveedores conectados aparecen en el Estudio.
 
 El catálogo incluye Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image y OmniHuman. La disponibilidad, los precios, las cuotas y el acceso preview dependen de cada proveedor.
 
@@ -81,6 +102,8 @@ Consulta [Proveedores y modelos](docs/providers.md) para credenciales e instrucc
 - Tareas síncronas y asíncronas normalizadas
 - Progreso en vivo, reutilización de prompts, vista previa y descargas
 - Interfaz adaptable para escritorio y móvil
+- Interfaz en inglés, portugués brasileño y español, con selector de idioma persistente
+- Varias conexiones cifradas por proveedor, prioridades, control de modelos visibles y descubrimiento de modelos cuando esté disponible
 - Credenciales disponibles únicamente en el servidor
 - Despliegue local, con Docker y en Vercel
 
@@ -92,7 +115,14 @@ Consulta [Proveedores y modelos](docs/providers.md) para credenciales e instrucc
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06b6d4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?logo=vercel)](https://vercel.com/)
 
-Next.js App Router, React 19, TypeScript estricto, Tailwind CSS 4, Framer Motion, Freepik API, Google Gen AI SDK, Vertex AI y Vercel AI Gateway.
+- Next.js App Router y rutas de API en el servidor
+- React 19, TypeScript estricto, Tailwind CSS 4 y Framer Motion
+- Componentes compartidos siguiendo las convenciones de shadcn, con primitivas de Base UI
+- SWR para datos en el cliente y next-intl para inglés, portugués brasileño y español
+- Catálogo de capacidades y contratos de generación comunes a los proveedores
+- Magnific API, Google Gen AI SDK, Vertex AI, Vercel AI Gateway y ToAPIs
+- Cloudinary para flujos que necesitan URLs públicas de medios
+- Historial en PostgreSQL/Neon o almacenamiento local explícito con un solo proceso
 
 ## Arquitectura
 
@@ -100,15 +130,18 @@ Next.js App Router, React 19, TypeScript estricto, Tailwind CSS 4, Framer Motion
 flowchart LR
     U[Espacio creativo] --> C[Capacidades del modelo]
     C --> A[API de generación]
-    A --> R[Registro de proveedores]
-    R --> F[Freepik]
+    A --> S[Servicio de generación]
+    S --> R[Registro de proveedores]
+    R --> F[Magnific]
     R --> G[Google AI Studio]
     R --> V[Vertex AI]
     R --> W[Vercel AI Gateway]
+    R --> O[ToAPIs]
     F --> T[Tareas y archivos normalizados]
     G --> T
     V --> T
     W --> T
+    O --> T
     T --> U
 ```
 
@@ -118,41 +151,78 @@ La interfaz lee las capacidades de los modelos. El backend convierte cada solici
 
 ### Requisitos previos
 
-- Node.js 22+
+- Node.js 22.23.4 o más reciente dentro de la línea Node 22
 - npm 10+
 - Credenciales de al menos un proveedor
 - Cloudinary únicamente para flujos que requieren URLs públicas de referencia
 
+### 1. Clona e instala
+
 ```bash
 git clone https://github.com/TechBeme/open-higgsfield.git
 cd open-higgsfield
-npm install
+npm ci
+```
+
+### 2. Configura el cifrado de conexiones
+
+```bash
 cp .env.example .env.local
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Copia el valor generado en `.env.local`:
+
+```dotenv
+PROVIDER_CONFIG_ENCRYPTION_KEY=<pega-el-valor-generado>
+```
+
+Esta clave cifra las credenciales guardadas desde la interfaz. Mantén el mismo valor entre reinicios y conserva una copia de seguridad separada de la configuración; cambiarlo impide descifrar las conexiones existentes. No subas `.env.local` a Git.
+
+### 3. Inicia y conecta un proveedor
+
+```bash
 npm run dev
 ```
 
-Configura únicamente los proveedores que quieras usar:
+Abre [http://localhost:3000](http://localhost:3000). Usa el selector de la barra superior para cambiar entre inglés, portugués y español.
+
+1. Abre **Proveedores**, selecciona un proveedor y pulsa **Añadir conexión**.
+2. Introduce un nombre y la clave de API, o los datos de la cuenta de servicio de Vertex AI. Puedes añadir varias conexiones y definir sus prioridades.
+3. Elige los modelos de imagen y video que quieres mostrar, vuelve al **Estudio** y escribe un prompt. Sin una conexión y un modelo habilitados, la generación permanece desactivada.
+
+**Descubrir modelos** está disponible para Google AI Studio y Vercel AI Gateway. El descubrimiento guarda candidatos para revisión; no los activa automáticamente. Los modelos personalizados reutilizan un adaptador compatible y necesitan un contrato de capacidades revisado. Consulta [configuración de proveedores](docs/providers.md#runtime-provider-configuration).
+
+El desarrollo escucha en `127.0.0.1`. Sin credenciales, mantén el servidor local; configura una contraseña y un origen HTTPS antes de exponer otro entorno.
+
+### Credenciales de entorno (opcional)
+
+Para instalaciones gestionadas mediante variables de entorno, configura en `.env.local` solo los proveedores que quieras usar:
 
 ```dotenv
-FREEPIK_API_KEY=
+MAGNIFIC_API_KEY=
 GEMINI_API_KEY=
 GOOGLE_CLOUD_PROJECT=
 GOOGLE_CLOUD_LOCATION=global
 GOOGLE_SERVICE_ACCOUNT_JSON=
 AI_GATEWAY_API_KEY=
+TOAPIS_API_KEY=
 CLOUDINARY_URL=
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). Nunca uses `NEXT_PUBLIC_` para credenciales de proveedores.
+Nunca uses `NEXT_PUBLIC_` para credenciales de proveedores. Solo se leen en el servidor.
 
-El desarrollo escucha en `127.0.0.1`. Sin credenciales, mantén el servidor local; configura una contraseña y un origen HTTPS antes de exponer otro entorno.
+Las conexiones guardadas tienen prioridad sobre las credenciales de entorno. Si desactivas todas las conexiones guardadas de un proveedor, sus modelos desaparecen del Estudio aunque exista una clave en el entorno.
 
 ### Docker
 
+Reutiliza el archivo `.env.local` ya configurado y completa la configuración de producción antes de iniciar el contenedor.
+
 ```bash
-cp .env.example .env.local
 docker compose up --build
 ```
+
+Configura el acceso de producción y el perfil de proceso único en la [guía de operación](docs/production.md) antes de iniciar Docker. Los archivos y el historial se guardan en el volumen `open-higgsfield-data`; el puerto 3000 se publica solo en loopback para un proxy inverso HTTPS.
 
 ## Despliegue en Vercel
 
@@ -169,9 +239,13 @@ Sigue la [guía de operación](docs/production.md) antes de iniciar Docker o pub
 | `npm run dev` | Inicia el servidor de desarrollo |
 | `npm run lint` | Ejecuta ESLint |
 | `npm run typecheck` | Comprueba TypeScript |
+| `npm test` | Ejecuta pruebas unitarias y de integración |
+| `npm run test:e2e` | Ejecuta pruebas aisladas de navegador y accesibilidad |
 | `npm run build` | Crea el build de producción |
-| `npm run check` | Ejecuta lint, typecheck y build |
+| `npm run check` | Ejecuta auditoría, lint, typecheck, pruebas, build y pruebas de navegador |
 | `npm start` | Sirve el build de producción |
+
+Configuración y aislamiento de las pruebas de navegador: [Verificación](docs/architecture.md#verification).
 
 ## Documentación
 
@@ -187,7 +261,7 @@ Lee [CONTRIBUTING.md](CONTRIBUTING.md), crea una rama enfocada, ejecuta `npm run
 
 ## Seguridad y aviso legal
 
-No informes vulnerabilidades en issues públicas. Open-Higgsfield es independiente y no está afiliado a Higgsfield AI, Freepik, Google, Vercel ni proveedores de modelos. Eres responsable de los costes, el contenido generado, la seguridad y el cumplimiento legal.
+No informes vulnerabilidades en issues públicas. Open-Higgsfield es independiente y no está afiliado a Higgsfield AI, Magnific, Google, Vercel ni proveedores de modelos. Eres responsable de los costes, el contenido generado, la seguridad y el cumplimiento legal.
 
 ## Licencia
 

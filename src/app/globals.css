@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'Manrope', system-ui, sans-serif;
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-manrope), sans-serif;
+  --font-display: var(--font-space-grotesk), sans-serif;
+  --font-mono: ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,7 +51,8 @@
 }
 
 :root {
-  /* Dark-only studio theme matching Flask */
+  color-scheme: dark;
+  /* Shared studio palette. */
   --background: #060606;
   --foreground: #f4f7fb;
   --card: rgba(16, 16, 16, .86);
@@ -63,7 +64,7 @@
   --secondary: rgba(255, 255, 255, .05);
   --secondary-foreground: rgba(244, 247, 251, .72);
   --muted: rgba(255, 255, 255, .05);
-  --muted-foreground: rgba(244, 247, 251, .44);
+  --muted-foreground: #a4abb4;
   --accent: rgba(255, 255, 255, .07);
   --accent-foreground: #f4f7fb;
   --destructive: #ff8080;
@@ -93,7 +94,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Manrope', system-ui, sans-serif;
+    font-family: var(--font-manrope), sans-serif;
     background:
       radial-gradient(circle at top left, rgba(255, 255, 255, .06), transparent 24%),
       radial-gradient(circle at 88% 78%, rgba(213, 255, 71, .08), transparent 18%),
@@ -104,6 +105,21 @@
 
   html {
     @apply font-sans;
+  }
+
+  /* Native option menus need an opaque surface, independent of the OS theme. */
+  select {
+    color: var(--foreground);
+  }
+
+  select option,
+  select optgroup {
+    background-color: #111111;
+    color: var(--foreground);
+  }
+
+  select option:disabled {
+    color: #a1a1aa;
   }
 }
 
@@ -133,5 +149,16 @@
   .model-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(244, 247, 251, .22);
     border-radius: 999px;
+  }
+}
+
+@layer base {
+  :where(button, a, input, select, textarea, summary, [role="switch"]):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
+  }
+  button:not(:disabled), summary { cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   }
 }

@@ -9,6 +9,31 @@ export interface FieldOption {
     value: string;
 }
 
+/** Portable, closed subset of JSON Schema used by documented model parameters. */
+export interface ParameterSchema {
+    type?: "string" | "number" | "integer" | "boolean" | "object" | "array" | "null" | Array<"string" | "number" | "integer" | "boolean" | "object" | "array" | "null">;
+    enum?: unknown[];
+    const?: unknown;
+    properties?: Record<string, ParameterSchema>;
+    required?: string[];
+    additionalProperties?: boolean | ParameterSchema;
+    items?: ParameterSchema;
+    minItems?: number;
+    maxItems?: number;
+    minimum?: number;
+    maximum?: number;
+    exclusiveMinimum?: number;
+    exclusiveMaximum?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    anyOf?: ParameterSchema[];
+    oneOf?: ParameterSchema[];
+    allOf?: ParameterSchema[];
+    description?: string;
+    default?: unknown;
+}
+
 /** A parameter the model supports */
 export interface FieldCapability<T = string> {
     options?: T[];
@@ -22,6 +47,9 @@ export interface MediaSlotCapability {
     kind: "image" | "video" | "audio";
     required?: boolean;
     multiple?: boolean;
+    max_count?: number;
+    min_count?: number;
+    max_bytes?: number;
     accept?: string;
     /** Describes the semantic role (e.g. "first_frame", "end_frame") */
     type?: string;
@@ -33,7 +61,13 @@ export interface MediaSlotCapability {
 export interface CustomFieldCapability {
     id: string;
     label: string;
-    type: "select" | "number" | "checkbox" | "text";
+    type: "select" | "number" | "checkbox" | "text" | "json";
+    required?: boolean;
+    step?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    schema?: ParameterSchema;
     default?: unknown;
     options?: string[];
     minimum?: number;
@@ -48,13 +82,17 @@ export interface ModelCapabilities {
     variant: string;
     group: string;
     category?: string;
+    /** Retained for saved-task recovery, excluded from new generation choices. */
+    deprecated?: boolean;
 
-    /** API provider used to execute this model. Legacy entries default to Freepik. */
-    provider?: ProviderId;
+    /** API provider used to execute this model. Every model must specify one. */
+    provider: ProviderId;
     /** Model identifier expected by the upstream provider. */
     provider_model_id?: string;
     /** Selects the provider API surface when a provider exposes more than one. */
-    provider_mode?: "native-image" | "language-image" | "image-model" | "video";
+    provider_mode?: "native-image" | "language-image" | "image-model" | "video" | "interaction";
+    /** Reviewed provider action, independent of the user-editable local model ID. */
+    provider_action?: string;
 
     /** Whether prompt is required */
     prompt_required: boolean;
@@ -85,6 +123,8 @@ export interface ModelCapabilities {
     shot_type: boolean;
     prompt_expansion: boolean;
     elements: boolean;
+    /** Optional seed control for providers using the canonical seed parameter. */
+    seed?: false | { minimum: number; maximum: number };
 
     /** Media input slots */
     media_slots: MediaSlotCapability[];
@@ -94,6 +134,10 @@ export interface ModelCapabilities {
 
     /** Sort key for UI ordering */
     sort_key?: number;
+
+    /** Runtime catalog metadata. These fields are omitted from legacy built-ins. */
+    catalog_source?: "builtin" | "discovered" | "custom";
+    catalog_status?: "verified" | "unverified" | "disabled";
 }
 
 /** Info about a model group for UI display */
@@ -101,4 +145,19 @@ export interface ModelGroupInfo {
     id: string;
     label: string;
     families: string[];
+}
+
+/** Extended image capability with image-specific fields */
+export interface ImageModelCapability extends ModelCapabilities {
+    /** Size UI configuration for pixel-based aspect ratio/resolution */
+    size_ui?: {
+        width_field: string;
+        height_field: string;
+        aspect_ratios: Array<{ id: string; w: number; h: number }>;
+        resolutions: Array<{ id: string; base: number }>;
+        default_aspect: string;
+        default_resolution: string;
+    };
+    /** Edit variant configuration */
+    has_edit_variant: boolean;
 }

@@ -26,6 +26,8 @@ APP_ACCESS_USER=operator
 APP_ACCESS_PASSWORD=<dedicated-random-secret-at-least-32-characters>
 GENERATION_ENABLED=false
 TASK_OBSERVATION_TIMEOUT_MS=86400000
+# Required before saving connections from /<locale>/settings.
+PROVIDER_CONFIG_ENCRYPTION_KEY=<independent-random-secret-at-least-32-characters>
 ```
 
 The origin is exactly HTTPS without trailing slash or path. Mutations require

@@ -5,7 +5,7 @@
 
   **The open-source, multi-provider alternative to Higgsfield for AI image and video generation.**
 
-  Generate with Freepik, Gemini, Google Vertex AI, and Vercel AI Gateway models from one focused creative studio.
+  Generate with Magnific, Google AI Studio, Google Vertex AI, Vercel AI Gateway, and ToAPIs models from one focused creative studio.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Live Demo</strong></a>
@@ -34,14 +34,14 @@
   </p>
 </div>
 
-![Open-Higgsfield AI image and video generation studio](docs/images/open-higgsfield-cover.png)
+![Open-Higgsfield Studio in English](docs/images/open-higgsfield-studio-en.png)
 
 ## Why Open-Higgsfield?
 
 AI media models are spread across providers, dashboards, payload formats, and incompatible controls. Open-Higgsfield brings them into one fast visual workspace:
 
 - **Generate images and videos in the same studio** without switching products.
-- **Choose from 40 curated models** across Freepik, Google AI Studio, Vertex AI, and Vercel AI Gateway.
+- **Choose image and video models** across Magnific, Google AI Studio, Vertex AI, Vercel AI Gateway, and ToAPIs.
 - **Use the right controls for every model** with capability-driven aspect ratios, resolutions, duration, seed, CFG, safety, and audio options.
 - **Work with references naturally** through image-to-image, image-to-video, start/end frames, video, and audio inputs.
 - **Switch providers without relearning the interface** because tasks, progress, errors, and outputs use one consistent workflow.
@@ -49,22 +49,43 @@ AI media models are spread across providers, dashboards, payload formats, and in
 
 ## Screenshots
 
-| Model discovery | Adaptive controls |
+### Provider management
+
+Connect your accounts, enable the models you want to use, and manage multiple API keys from one place. Only models from connected providers appear in the Studio.
+
+![Open-Higgsfield provider management in English](docs/images/open-higgsfield-providers-en.png)
+
+### Connections and model selection
+
+Each provider has its own connections, priorities, and model visibility settings. In the Studio, search by model name or ID and filter by provider.
+
+| Provider settings | Searchable model picker |
 | --- | --- |
-| ![Open-Higgsfield model selector](docs/images/open-higgsfield-models.png) | ![Open-Higgsfield advanced generation controls](docs/images/open-higgsfield-controls.png) |
+| ![Google AI Studio connections and model visibility](docs/images/open-higgsfield-provider-detail-en.png) | ![Searchable Studio model picker in English](docs/images/open-higgsfield-models-en.png) |
 
-### Unified generation workspace
+### Desktop and mobile Studio
 
-![Open-Higgsfield generation workspace with a sample image gallery](docs/images/open-higgsfield-workspace.png)
+The same workspace supports image and video generation, with controls derived from each model's capabilities. Before a provider is connected, generation stays disabled and the setup action is visible.
+
+<p align="center">
+  <img src="docs/images/open-higgsfield-studio-mobile-en.png" alt="Open-Higgsfield Studio on mobile in English" width="320" />
+</p>
+
+Captured with Playwright from the production build in an isolated workspace. The connections and prompt are demonstration data; no real API keys, private media, or paid generations were used.
 
 ## Supported providers
 
-| Provider | Images | Videos | Authentication |
+Connect a provider from **Providers**, or configure its environment credentials. The built-in catalog currently contains these image and video entries:
+
+| Provider | Images | Videos | Environment credentials |
 | --- | ---: | ---: | --- |
-| Freepik | 7 | 16 | `FREEPIK_API_KEY` |
-| Google AI Studio | 3 | 1 | `GEMINI_API_KEY` |
-| Google Vertex AI | 2 | 1 | Google Cloud credentials |
-| Vercel AI Gateway | 5 | 5 | `AI_GATEWAY_API_KEY` |
+| Magnific | 50 | 117 | `MAGNIFIC_API_KEY` |
+| Google AI Studio | 5 | 1 | `GEMINI_API_KEY` |
+| Google Vertex AI | 4 | 4 | Google Cloud credentials |
+| Vercel AI Gateway | 45 | 39 | `AI_GATEWAY_API_KEY` |
+| ToAPIs | 51 | 51 | `TOAPIS_API_KEY` |
+
+Counts verified against `/api/catalog` on November 2, 2026. Entries include workflow variants, not just distinct upstream models. Only enabled models from connected providers appear in the Studio.
 
 The catalog includes Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image, and OmniHuman. Model availability, pricing, quotas, and preview access are controlled by each upstream provider.
 
@@ -81,7 +102,8 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - Normalized synchronous and asynchronous generation tasks
 - Live progress, reusable prompts, previews, and downloads
 - Responsive desktop and mobile command interface
-- Interface in English and Brazilian Portuguese
+- Interface in English, Brazilian Portuguese, and Spanish, with a persistent language selector
+- Multiple encrypted connections per provider, connection priorities, model visibility controls, and model discovery where supported
 - Server-only provider credentials
 - Local Node.js, Docker, and Vercel deployment support
 
@@ -95,8 +117,10 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 
 - Next.js App Router and server route handlers
 - React 19, strict TypeScript, Tailwind CSS 4, and Framer Motion
+- Shared UI components following shadcn conventions, built on Base UI primitives
+- SWR for client data and next-intl for English, Brazilian Portuguese, and Spanish
 - Capability-driven model catalog and provider-neutral generation contracts
-- Freepik API, Google Gen AI SDK, Vertex AI, and Vercel AI Gateway
+- Magnific API, Google Gen AI SDK, Vertex AI, Vercel AI Gateway, and ToAPIs
 - Cloudinary handoff for workflows that require public reference-media URLs
 - PostgreSQL/Neon task history, or an explicit single-process local store
 
@@ -108,14 +132,16 @@ flowchart LR
     C --> A[Generation API]
     A --> S[Provider-neutral service]
     S --> R[Provider registry]
-    R --> F[Freepik]
+    R --> F[Magnific]
     R --> G[Google AI Studio]
     R --> V[Vertex AI]
     R --> W[Vercel AI Gateway]
+    R --> O[ToAPIs]
     F --> T[Normalized tasks and assets]
     G --> T
     V --> T
     W --> T
+    O --> T
     T --> U
 ```
 
@@ -127,7 +153,7 @@ See [Architecture](docs/architecture.md) for the complete request lifecycle and 
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 22.23.4 or newer within the Node 22 release line
 - npm 10+
 - At least one supported provider credential
 - Cloudinary credentials only when a workflow requires public reference-media URLs
@@ -137,20 +163,47 @@ See [Architecture](docs/architecture.md) for the complete request lifecycle and 
 ```bash
 git clone https://github.com/TechBeme/open-higgsfield.git
 cd open-higgsfield
-npm install
+npm ci
 ```
 
-### 2. Configure the environment
+### 2. Configure connection encryption
 
 ```bash
 cp .env.example .env.local
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Configure only the providers you want to use:
+Copy the generated value into `.env.local`:
 
 ```dotenv
-# Freepik
-FREEPIK_API_KEY=
+PROVIDER_CONFIG_ENCRYPTION_KEY=<paste-the-generated-value>
+```
+
+This encrypts the provider credentials saved through the interface. Keep it stable across restarts and back it up separately from the stored configuration; replacing it prevents existing connections from being decrypted. Do not commit `.env.local`.
+
+### 3. Start and connect a provider
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). Use the language selector in the top bar to switch between English, Portuguese, and Spanish.
+
+1. Open **Providers**, select a provider, and choose **Add connection**.
+2. Enter a name and API key, or the service account details for Vertex AI. You can add multiple connections and set their priorities.
+3. Choose which image and video models to show, then return to **Studio** and enter a prompt. Without an enabled connection and model, generation stays disabled.
+
+**Discover models** is available for Google AI Studio and Vercel AI Gateway. Discovery saves candidates for review; it does not activate new models automatically. Custom models reuse a compatible adapter and require a reviewed capability contract. See [runtime configuration](docs/providers.md#runtime-provider-configuration).
+
+Development binds to `127.0.0.1`. Credential-free development must remain local; use explicit credentials and an HTTPS origin before exposing another environment.
+
+### Environment credentials (optional)
+
+For deployments managed through environment variables, configure only the providers you use in `.env.local`:
+
+```dotenv
+# Magnific
+MAGNIFIC_API_KEY=
 
 # Google AI Studio
 GEMINI_API_KEY=
@@ -163,27 +216,22 @@ GOOGLE_SERVICE_ACCOUNT_JSON=
 # Vercel AI Gateway
 AI_GATEWAY_API_KEY=
 
+# ToAPIs
+TOAPIS_API_KEY=
+
 # Reference-media uploads
 CLOUDINARY_URL=
 ```
 
 Never use `NEXT_PUBLIC_` for provider credentials. Open-Higgsfield reads them only from server-side modules.
 
-### 3. Start Open-Higgsfield
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) and start generating.
-
-Development binds to `127.0.0.1`. Credential-free development must remain local;
-use explicit credentials and an HTTPS origin before exposing another environment.
+Saved connections take precedence over environment credentials. If you disable every saved connection for a provider, its models disappear from the Studio even if an environment key exists.
 
 ### Docker
 
+Reuse the `.env.local` file configured above and complete the production setup before starting the container.
+
 ```bash
-cp .env.example .env.local
 docker compose up --build
 ```
 
@@ -193,7 +241,11 @@ Configure the production access and single-process profile from the [operator gu
 
 Production requires an operator credential, an HTTPS origin, migrated PostgreSQL task storage, explicitly public Cloudinary outputs and recurring execution. The included minute cron requires **Vercel Pro or Enterprise**. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
 
-This is one shared BYOK workspace: authenticated people share tasks and spending authority. There are no per-user ownership boundaries, application monetary budgets or global rate limits. Configure provider quotas/budgets and ingress controls before enabling work. Cloudinary media remains public by URL.
+Each deployment is one operator-owned BYOK workspace. There are no per-user
+ownership boundaries, application monetary budgets or global rate limits; if the
+operator shares the URL, every visitor uses that deployment's credentials and
+quota. Configure provider quotas/budgets and ingress controls before enabling
+work. Cloudinary media remains public by URL.
 
 Follow the [production operator guide](docs/production.md) for configuration, migration, scheduler verification and rollback before deploying.
 
@@ -204,9 +256,13 @@ Follow the [production operator guide](docs/production.md) for configuration, mi
 | `npm run dev` | Start the development server |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Run TypeScript checks |
+| `npm test` | Run unit and integration regressions |
+| `npm run test:e2e` | Run isolated browser and accessibility tests |
 | `npm run build` | Create a production build |
-| `npm run check` | Run lint, typecheck, and build |
+| `npm run check` | Run dependency audit, lint, typecheck, tests, build, and browser tests |
 | `npm start` | Serve the production build |
+
+Browser-test setup and isolation details: [Verification](docs/architecture.md#verification).
 
 ## Documentation
 
@@ -233,7 +289,7 @@ Do not report vulnerabilities in public issues. Follow [SECURITY.md](SECURITY.md
 
 ## Disclaimer
 
-Open-Higgsfield is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Higgsfield AI, Freepik, Google, Vercel, or any model provider. Product and model names belong to their respective owners. Availability, pricing, quotas, APIs, and capabilities may change upstream.
+Open-Higgsfield is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Higgsfield AI, Magnific, Google, Vercel, or any model provider. Product and model names belong to their respective owners. Availability, pricing, quotas, APIs, and capabilities may change upstream.
 
 You are responsible for provider costs, generated content, deployment security, and compliance with provider terms and applicable law.
 

@@ -1,7 +1,7 @@
 import type { CanonicalMediaInputs, CanonicalParams } from "@/models/canonical";
 import type { ModelCapabilities } from "@/models/capabilities/types";
 
-export type ProviderId = "freepik" | "google-ai-studio" | "google-vertex" | "vercel-ai-gateway" | "toapis";
+export type ProviderId = "magnific" | "google-ai-studio" | "google-vertex" | "vercel-ai-gateway" | "toapis";
 export type GenerationStatus = "CREATED" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "ERROR" | "CANCELLED";
 
 export interface GeneratedAsset {
@@ -20,6 +20,15 @@ export interface ProviderGenerationRequest {
     capabilities: ModelCapabilities;
     params: CanonicalParams;
     media: CanonicalMediaInputs;
+    connection?: ProviderConnectionContext;
+}
+
+/** A provider connection is resolved server-side and is never sent to the browser. */
+export interface ProviderConnectionContext {
+    id: string;
+    providerId: ProviderId;
+    secret?: string;
+    metadata: Record<string, unknown>;
 }
 
 export type ProviderSubmission = {
@@ -37,6 +46,7 @@ export interface ProviderPollRequest {
     mediaType: "image" | "video";
     providerModelId: string;
     operation: unknown;
+    connection?: ProviderConnectionContext;
 }
 
 export type ProviderPollResult = {

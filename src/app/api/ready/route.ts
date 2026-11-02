@@ -1,6 +1,6 @@
-import { applyWorkspaceHeaders, guardWorkspaceRequest, accessFailure } from "@/lib/workspace-access";
-import { assertRuntimeConfiguration } from "@/lib/production-config";
-import { withSignal } from "@/lib/task-runtime";
+import { applyWorkspaceHeaders, guardWorkspaceRequest, accessFailure } from "@/server/security/workspace-access";
+import { assertRuntimeConfiguration } from "@/server/config/production";
+import { withSignal } from "@/server/tasks/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     if (denial) return denial;
     try {
         const configuration = assertRuntimeConfiguration();
-        const { initStore, listTasks } = await import("@/lib/task-store");
+        const { initStore, listTasks } = await import("@/server/tasks/store");
         await withSignal(AbortSignal.any([request.signal, AbortSignal.timeout(8_000)]), async () => {
             await initStore();
             await listTasks("image", { limit: 1 });

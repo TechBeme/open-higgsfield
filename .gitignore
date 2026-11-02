@@ -16,6 +16,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -56,6 +57,7 @@ next-env.d.ts
 /uploads/
 /tasks_history.json
 /tasks_history.json.tmp
+/provider-runtime-config.json
 
 # local screenshots and temporary artifacts
 /image*.png
