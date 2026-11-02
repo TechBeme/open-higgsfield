@@ -1,0 +1,5 @@
+# Magnific model catalog
+
+Refreshed 2026-11-01 from the official [OpenAPI contract](https://storage.googleapis.com/fc-freepik-pro-rev1-eu-api-specs/magnific-api-v1-openapi.yaml) and [current documentation](https://docs.magnific.com/). The app registers 50 image and 117 video/image-media contracts, including Seedance 2.5, Nano Banana 2.1, GPT Image 2.5, Kling 4K, Hailuo H3, Wan 2.7, Happy Horse 1.1, PixVerse 6, Veo 3.1 Lite and current upscalers.
+
+Every registered contract is generated from the published request schema. Scalar ranges, enums, nested objects, required values and reference counts are validated before an upload or paid request. Webhook/auth/origin fields are deliberately infrastructure-owned. The legacy Freepik provider and catalog have been removed. All Magnific entries use the current API origin and `MAGNIFIC_API_KEY`. The provider verifier also exercises synchronous classic image responses, async task identities, poll status handling, URL restrictions and uncertain-submit behavior.

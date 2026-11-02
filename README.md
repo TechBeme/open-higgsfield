@@ -5,7 +5,7 @@
 
   **The open-source, multi-provider alternative to Higgsfield for AI image and video generation.**
 
-  Generate with Freepik, Gemini, Google Vertex AI, and Vercel AI Gateway models from one focused creative studio.
+  Generate with Magnific, Gemini, Google Vertex AI, and Vercel AI Gateway models from one focused creative studio.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Live Demo</strong></a>
@@ -41,7 +41,7 @@
 AI media models are spread across providers, dashboards, payload formats, and incompatible controls. Open-Higgsfield brings them into one fast visual workspace:
 
 - **Generate images and videos in the same studio** without switching products.
-- **Choose from 40 curated models** across Freepik, Google AI Studio, Vertex AI, and Vercel AI Gateway.
+- **Choose image and video models** across Magnific, Google AI Studio, Vertex AI, and Vercel AI Gateway.
 - **Use the right controls for every model** with capability-driven aspect ratios, resolutions, duration, seed, CFG, safety, and audio options.
 - **Work with references naturally** through image-to-image, image-to-video, start/end frames, video, and audio inputs.
 - **Switch providers without relearning the interface** because tasks, progress, errors, and outputs use one consistent workflow.
@@ -61,10 +61,11 @@ AI media models are spread across providers, dashboards, payload formats, and in
 
 | Provider | Images | Videos | Authentication |
 | --- | ---: | ---: | --- |
-| Freepik | 7 | 16 | `FREEPIK_API_KEY` |
-| Google AI Studio | 3 | 1 | `GEMINI_API_KEY` |
-| Google Vertex AI | 2 | 1 | Google Cloud credentials |
-| Vercel AI Gateway | 5 | 5 | `AI_GATEWAY_API_KEY` |
+| Magnific | 50 | 117 | `MAGNIFIC_API_KEY` |
+| Google AI Studio | 5 | 2 | `GEMINI_API_KEY` |
+| Google Vertex AI | 4 | 4 | Google Cloud credentials |
+| Vercel AI Gateway | 45 | 39 | `AI_GATEWAY_API_KEY` |
+| ToAPIs | 51 | 53 | `TOAPIS_API_KEY` |
 
 The catalog includes Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image, and OmniHuman. Model availability, pricing, quotas, and preview access are controlled by each upstream provider.
 
@@ -81,7 +82,7 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - Normalized synchronous and asynchronous generation tasks
 - Live progress, reusable prompts, previews, and downloads
 - Responsive desktop and mobile command interface
-- Interface in English and Brazilian Portuguese
+- Interface in English, Brazilian Portuguese, and Spanish, with a persistent language selector
 - Server-only provider credentials
 - Local Node.js, Docker, and Vercel deployment support
 
@@ -96,7 +97,7 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - Next.js App Router and server route handlers
 - React 19, strict TypeScript, Tailwind CSS 4, and Framer Motion
 - Capability-driven model catalog and provider-neutral generation contracts
-- Freepik API, Google Gen AI SDK, Vertex AI, and Vercel AI Gateway
+- Magnific API, Google Gen AI SDK, Vertex AI, and Vercel AI Gateway
 - Cloudinary handoff for workflows that require public reference-media URLs
 - PostgreSQL/Neon task history, or an explicit single-process local store
 
@@ -108,7 +109,7 @@ flowchart LR
     C --> A[Generation API]
     A --> S[Provider-neutral service]
     S --> R[Provider registry]
-    R --> F[Freepik]
+    R --> F[Magnific]
     R --> G[Google AI Studio]
     R --> V[Vertex AI]
     R --> W[Vercel AI Gateway]
@@ -149,8 +150,8 @@ cp .env.example .env.local
 Configure only the providers you want to use:
 
 ```dotenv
-# Freepik
-FREEPIK_API_KEY=
+# Magnific
+MAGNIFIC_API_KEY=
 
 # Google AI Studio
 GEMINI_API_KEY=
@@ -168,6 +169,13 @@ CLOUDINARY_URL=
 ```
 
 Never use `NEXT_PUBLIC_` for provider credentials. Open-Higgsfield reads them only from server-side modules.
+
+After starting the app, open `/en/settings`, `/pt-BR/settings`, or `/es/settings` to manage
+one or more encrypted provider connections, rotate which connection is used,
+enable or disable catalog models, sync gateway model IDs, and save a reviewed
+custom capability contract. Set `PROVIDER_CONFIG_ENCRYPTION_KEY` before saving
+connections. Environment keys remain supported as a fallback for installations
+that do not use the settings screen.
 
 ### 3. Start Open-Higgsfield
 
@@ -193,7 +201,11 @@ Configure the production access and single-process profile from the [operator gu
 
 Production requires an operator credential, an HTTPS origin, migrated PostgreSQL task storage, explicitly public Cloudinary outputs and recurring execution. The included minute cron requires **Vercel Pro or Enterprise**. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
 
-This is one shared BYOK workspace: authenticated people share tasks and spending authority. There are no per-user ownership boundaries, application monetary budgets or global rate limits. Configure provider quotas/budgets and ingress controls before enabling work. Cloudinary media remains public by URL.
+Each deployment is one operator-owned BYOK workspace. There are no per-user
+ownership boundaries, application monetary budgets or global rate limits; if the
+operator shares the URL, every visitor uses that deployment's credentials and
+quota. Configure provider quotas/budgets and ingress controls before enabling
+work. Cloudinary media remains public by URL.
 
 Follow the [production operator guide](docs/production.md) for configuration, migration, scheduler verification and rollback before deploying.
 
@@ -204,9 +216,13 @@ Follow the [production operator guide](docs/production.md) for configuration, mi
 | `npm run dev` | Start the development server |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Run TypeScript checks |
+| `npm test` | Run unit and integration regressions |
+| `npm run test:e2e` | Run isolated browser and accessibility tests |
 | `npm run build` | Create a production build |
-| `npm run check` | Run lint, typecheck, and build |
+| `npm run check` | Run dependency audit, lint, typecheck, tests, build, and browser tests |
 | `npm start` | Serve the production build |
+
+Browser-test setup and isolation details: [Verification](docs/architecture.md#verification).
 
 ## Documentation
 
@@ -233,7 +249,7 @@ Do not report vulnerabilities in public issues. Follow [SECURITY.md](SECURITY.md
 
 ## Disclaimer
 
-Open-Higgsfield is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Higgsfield AI, Freepik, Google, Vercel, or any model provider. Product and model names belong to their respective owners. Availability, pricing, quotas, APIs, and capabilities may change upstream.
+Open-Higgsfield is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Higgsfield AI, Magnific, Google, Vercel, or any model provider. Product and model names belong to their respective owners. Availability, pricing, quotas, APIs, and capabilities may change upstream.
 
 You are responsible for provider costs, generated content, deployment security, and compliance with provider terms and applicable law.
 

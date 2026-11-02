@@ -31,6 +31,8 @@ export function createModuleLoader({ mocks = {}, env = {}, globals = {} } = {}) 
             fileName: filename,
         }).outputText;
         const resolve = (name) => {
+            // The loader executes backend code outside Next's React Server environment.
+            if (name === "server-only") return {};
             if (Object.hasOwn(mocks, name)) return mocks[name];
             if (name.startsWith("@/")) return load(name);
             if (name.startsWith(".")) return load(path.resolve(path.dirname(filename), name));

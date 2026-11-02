@@ -1,5 +1,6 @@
 import type { ProviderId } from "@/providers/types";
-import type { TaskPhase } from "@/lib/task-record";
+export type TaskPhase = "submitting" | "polling" | "materializing" | "paused" | "submission_unknown" | "terminal";
+import type { ModelCapabilities } from "@/models/capabilities/types";
 
 export type MediaType = "video" | "image";
 
@@ -50,6 +51,8 @@ export interface VideoTask extends TaskLifecycleFields {
     task_id: string;
     status?: string;
     provider_id?: ProviderId;
+    provider_connection_id?: string;
+    provider_capabilities?: ModelCapabilities;
     provider_model_id?: string;
     provider_task_id?: string;
     provider_operation?: unknown;
@@ -77,6 +80,8 @@ export interface ImageTask extends TaskLifecycleFields {
     task_id: string;
     status?: string;
     provider_id?: ProviderId;
+    provider_connection_id?: string;
+    provider_capabilities?: ModelCapabilities;
     provider_model_id?: string;
     provider_task_id?: string;
     provider_operation?: unknown;

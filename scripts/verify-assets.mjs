@@ -38,7 +38,7 @@ function transferHarness(options = {}) {
             "node:https": { get }, "node:http": { get }, ...options.mocks,
         },
     });
-    return { state, loader, transfer: loader.load("@/lib/media-transfer"), safe: loader.load("@/lib/safe-url") };
+    return { state, loader, transfer: loader.load("@/server/media/transfer"), safe: loader.load("@/server/media/safe-url") };
 }
 
 test("media GET connects only to checked DNS address while preserving hostname and rejecting redirects", async () => {
@@ -158,7 +158,7 @@ async function storageHarness(t, options = {}) {
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
     const loader = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: dir, ...options.env },
         globals: options.globals ?? {}, mocks: options.mocks ?? {} });
-    return { dir, loader, upload: loader.load("@/lib/upload"), assets: loader.load("@/lib/generated-assets"), source: loader.load("@/lib/asset-source") };
+    return { dir, loader, upload: loader.load("@/server/media/storage"), assets: loader.load("@/server/media/generated-assets"), source: loader.load("@/server/media/asset-source") };
 }
 
 const taskFixture = (id = "synthetic", media = "image") => ({ task_id: id, media_type: media,
@@ -231,15 +231,15 @@ test("production storage rejects ephemeral/distributed local and requires public
     for (const env of [{ NODE_ENV: "production" }, { DATABASE_URL: "synthetic" }, { ASSET_STORAGE_MODE: "local", VERCEL: "1" },
         { NODE_ENV: "production", ASSET_STORAGE_MODE: "local" }, { ASSET_STORAGE_MODE: "cloudinary" },
         { ASSET_STORAGE_MODE: "cloudinary", ASSET_DELIVERY_MODE: "private" }]) {
-        assert.throws(() => createModuleLoader({ env }).load("@/lib/generated-assets").assertGeneratedStorageConfigured());
+        assert.throws(() => createModuleLoader({ env }).load("@/server/media/generated-assets").assertGeneratedStorageConfigured());
     }
     assert.equal(createModuleLoader({ env: { NODE_ENV: "production", ASSET_STORAGE_MODE: "local", OPEN_HIGGSFIELD_STORAGE_DIR: "/tmp/synthetic-persistent" } })
-        .load("@/lib/generated-assets").assertGeneratedStorageConfigured(), "local");
+        .load("@/server/media/generated-assets").assertGeneratedStorageConfigured(), "local");
 });
 
 test("legacy data fallback works when a single attachment's local file is missing, including route indices", async (t) => {
     const state = { task: undefined };
-    const h = await storageHarness(t, { mocks: { "@/lib/task-store": { initStore: async () => {}, getTask: async () => state.task } } });
+    const h = await storageHarness(t, { mocks: { "@/server/tasks/store": { initStore: async () => {}, getTask: async () => state.task } } });
     const task = { ...taskFixture("legacy"), result_paths: [path.join(h.dir, "downloads/images/missing.png")], result_urls: [`data:image/png;base64,${png.toString("base64")}`] };
     state.task = task;
     const route = h.loader.load("src/app/api/download/[taskId]/route.ts");
@@ -307,7 +307,7 @@ test("local and uploaded streams retain the operation deadline through an uncons
             const handle = await fs.open(...args); handles.push(handle); return handle;
         } } },
     });
-    const source = loader.load("@/lib/asset-source");
+    const source = loader.load("@/server/media/asset-source");
     for (const getResponse of [
         () => source.taskAssetResponse(task, 0, new Request("http://localhost/"), false),
         () => source.uploadedAssetResponse(uploaded.split("/").at(-1), new Request("http://localhost/")),
@@ -345,7 +345,7 @@ test("expiry while local open is pending closes a late descriptor", async (t) =>
             const handle = await fs.open(...args); handles.push(handle); return handle;
         } },
     } });
-    const pending = loader.load("@/lib/upload").openLocalMedia(path.join(h.dir, "uploads", uploaded.split("/").at(-1)), path.join(h.dir, "uploads"), { signal: control.signal });
+    const pending = loader.load("@/server/media/storage").openLocalMedia(path.join(h.dir, "uploads", uploaded.split("/").at(-1)), path.join(h.dir, "uploads"), { signal: control.signal });
     await opening;
     control.abort(); await assert.rejects(pending);
     finishOpen();
@@ -355,7 +355,7 @@ test("expiry while local open is pending closes a late descriptor", async (t) =>
 
 test("UI attachment URLs retain the image index and request attachment delivery for image and video previews", async (t) => {
     const state = { task: undefined };
-    const h = await storageHarness(t, { mocks: { "@/lib/task-store": { initStore: async () => {}, getTask: async () => state.task } } });
+    const h = await storageHarness(t, { mocks: { "@/server/tasks/store": { initStore: async () => {}, getTask: async () => state.task } } });
     const { attachmentUrl } = h.loader.load("@/lib/download-url");
     const route = h.loader.load("src/app/api/download/[taskId]/route.ts");
     for (const media of ["image", "video"]) {
@@ -402,21 +402,21 @@ test("Vercel legacy full responses fail before emission above 4 MiB, while local
     await local.assets.attachGeneratedAssets(task, [{ data: large }]);
     const localResponse = await local.source.taskAssetResponse(task, 0, new Request("http://localhost/"), false);
     assert.equal((await localResponse.arrayBuffer()).byteLength, large.length);
-    const serverless = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: local.dir, VERCEL: "1" } }).load("@/lib/asset-source");
+    const serverless = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: local.dir, VERCEL: "1" } }).load("@/server/media/asset-source");
     await assert.rejects(serverless.taskAssetResponse(task, 0, new Request("http://localhost/"), false), /ERR_LEGACY_ASSET_REQUIRES_MIGRATION/);
     const slice = await serverless.taskAssetResponse(task, 0, new Request("http://localhost/", { headers: { range: "bytes=0-10" } }), false);
     assert.equal(slice.status, 206); assert.equal((await slice.arrayBuffer()).byteLength, 11);
     const inline = { ...taskFixture("inline"), result_urls: [`data:image/png;base64,${large.toString("base64")}`] };
     await assert.rejects(serverless.taskAssetResponse(inline, 0, new Request("http://localhost/"), false), /ERR_LEGACY_ASSET_REQUIRES_MIGRATION/);
     const remote = transferHarness({ env: { VERCEL: "1" }, data: large });
-    const source = remote.loader.load("@/lib/asset-source");
+    const source = remote.loader.load("@/server/media/asset-source");
     await assert.rejects(source.taskAssetResponse({ ...taskFixture(), result_urls: ["https://media.example/legacy.png"] }, 0, new Request("http://localhost/"), false), /ERR_LEGACY_ASSET_REQUIRES_MIGRATION/);
     assert.ok(remote.state.incoming.destroyed);
 });
 
 test("gallery accepts strict index and returns an application reference without self-fetch or local paths", async (t) => {
     const task = { ...taskFixture("gallery"), result_urls: [`data:image/png;base64,${png.toString("base64")}`] };
-    const h = await storageHarness(t, { mocks: { "@/lib/task-store": { initStore: async () => {}, getTask: async () => task } } });
+    const h = await storageHarness(t, { mocks: { "@/server/tasks/store": { initStore: async () => {}, getTask: async () => task } } });
     const route = h.loader.load("src/app/api/save-to-gallery/route.ts");
     const request = (value) => routeRequest("/api/save-to-gallery", { method: "POST", body: JSON.stringify(value), headers: { "content-type": "application/json", origin: "http://localhost" } });
     const result = await route.POST(request({ task_id: "gallery" }));
@@ -435,14 +435,14 @@ test("Sharp rejects excessive compressed dimensions and malformed metadata befor
         for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
     }
     huge.writeUInt32BE((crc ^ 0xffffffff) >>> 0, 29);
-    const real = createModuleLoader().load("@/lib/media-upload");
+    const real = createModuleLoader().load("@/server/media/input-upload");
     await assert.rejects(real.toJpeg(huge), /pixel|limit/i);
     let converted = false;
     let metadata;
     const fake = createModuleLoader({ mocks: { sharp: () => ({
         metadata: async () => metadata,
         jpeg() { converted = true; return this; }, destroy() {},
-    }) } }).load("@/lib/media-upload");
+    }) } }).load("@/server/media/input-upload");
     for (metadata of [{ width: undefined, height: 2 }, { width: -1, height: 2 }, { width: 1, height: 1, pages: NaN },
         { width: 1, height: 1, pages: 0 }, { width: 10_000, height: 4_000, pages: 2 }]) {
         await assert.rejects(fake.toJpeg(png), /ERR_IMAGE_PIXEL_LIMIT/);

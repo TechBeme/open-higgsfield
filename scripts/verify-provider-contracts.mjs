@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import vm from "node:vm";
-import { createRequire } from "node:module";
-import ts from "typescript";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import * as googleSdk from "@google/genai";
 import * as aiSdk from "ai";
 import { createModuleLoader } from "./test-module-loader.mjs";
@@ -16,7 +11,6 @@ const outputUrl = "https://fixtures.example.test/output.mp4";
 const safeMessage = /^ERR_[A-Z0-9_]+$/;
 const json = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", ...headers } });
 const plain = value => JSON.parse(JSON.stringify(value));
-const requireDependency = createRequire(import.meta.url);
 function assertError(error, fields) {
     assert.match(error.code, safeMessage);
     assert.equal(error.message, error.code);
@@ -42,165 +36,13 @@ function toapisFixture({ env = { TOAPIS_API_KEY: syntheticKey }, handler } = {})
         return json({ id: "tsk_synthetic", object: "generation.task", model, status: "pending" });
     };
     const modules = createModuleLoader({ env, globals: { fetch } });
-    return { ...modules, calls, provider: new (modules.load("src/providers/toapis.ts").ToapisProvider)() };
+    return { ...modules, calls, provider: new (modules.load("src/server/providers/toapis.ts").ToapisProvider)() };
 }
 const operation = model => ({ version: 1, taskId: "tsk_synthetic", mediaType: model.startsWith("gpt-") ? "image" : "video", model, origin: "https://toapis.com" });
 const pollRequest = (model = "seedance-2-5", overrides = {}) => ({ mediaType: operation(model).mediaType, providerModelId: model, operation: operation(model), ...overrides });
-const taskResponse = (status, extra = {}, model = "seedance-2-5") => ({ id: "tsk_synthetic", object: "generation.task", model, status, ...extra });
 
-test("ToAPIs every advertised image and video ratio/resolution matches its payload contract", async () => {
-    const fixture = toapisFixture();
-    const { TOAPIS_IMAGE_CAPABILITIES: images, TOAPIS_VIDEO_CAPABILITIES: videos } = fixture.load("src/models/capabilities/toapis.ts");
-    assert.equal(Object.keys(images).length, 2);
-    assert.equal(Object.keys(videos).length, 4);
-    for (const caps of Object.values(images)) {
-        for (const ratio of caps.size_ui.aspect_ratios) for (const resolution of caps.size_ui.resolutions) {
-            const value = `${ratio.w}:${ratio.h}`;
-            await fixture.provider.submit(request(caps.provider_model_id, { params: { prompt: "Synthetic image", aspect_ratio: value, resolution: resolution.id } }));
-            const body = JSON.parse(fixture.calls.at(-1).body);
-            assert.equal(body.size, value);
-            assert.equal(body.resolution, caps.provider_model_id === "gpt-image-2" ? resolution.id.toLowerCase() : resolution.id);
-            assert.equal(body.n, 1);
-            assert.equal(body.quality, caps.provider_model_id === "gpt-image-2" ? undefined : "high");
-            assert.equal(body.client_business_id, undefined);
-        }
-    }
-    for (const caps of Object.values(videos)) {
-        for (const [, ratio] of caps.aspect_ratio.options) for (const resolution of caps.resolution_variant.options) {
-            const result = await fixture.provider.submit(request(caps.provider_model_id, { params: { prompt: "Synthetic video", aspect_ratio: ratio, resolution, duration: "4" } }));
-            const body = JSON.parse(fixture.calls.at(-1).body);
-            assert.equal(body.aspect_ratio, caps.provider_model_id === "seedance-2-5" ? "adaptive" : ratio);
-            assert.equal(body.generate_audio, false);
-            assert.equal(body.duration, 4);
-            assert.equal(body.client_business_id, "local-test-id");
-            assert.deepEqual(body.image_with_roles, [{ role: "first_frame", url: mediaUrl }]);
-            assert.deepEqual(plain(result.operation), operation(caps.provider_model_id));
-            assert.equal(JSON.stringify(result.operation).includes(syntheticKey), false);
-        }
-    }
-    assert.equal(Object.keys(fixture.load("src/models/capabilities/video.ts").VIDEO_CAPABILITIES).includes("toapis__seedance-2-5"), true);
-    assert.equal(Object.keys(fixture.load("src/models/capabilities/image.ts").IMAGE_CAPABILITIES).includes("toapis__gpt-image-2"), true);
-    for (const call of fixture.calls) {
-        assert.equal(call.redirect, "error");
-        assert.equal(call.method, "POST");
-        assert.ok(call.signal instanceof AbortSignal);
-        assert.equal(call.headers.Authorization, `Bearer ${syntheticKey}`);
-    }
-});
-
-test("actual defaultSettings used by CommandBar selects adaptive, and switching models resets a fixed ratio", async () => {
-    const fixture = toapisFixture();
-    const source = fs.readFileSync(new URL("../src/components/studio/SettingsPanel.tsx", import.meta.url), "utf8");
-    const parsed = ts.createSourceFile("SettingsPanel.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-    const declaration = parsed.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "defaultSettings");
-    assert.ok(declaration);
-    const code = ts.transpileModule(declaration.getText(parsed), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
-    const helpers = fixture.load("src/models/capabilities/video-helpers.ts");
-    const context = { ...helpers, exports: {} };
-    vm.runInNewContext(code, context);
-    const caps = fixture.load("src/models/capabilities/toapis.ts").TOAPIS_VIDEO_CAPABILITIES;
-    for (const name of ["seedance-2-5", "seedance-2", "seedance-2-5"]) {
-        const settings = context.exports.defaultSettings(caps[`toapis__${name}`]);
-        const expected = name === "seedance-2-5" ? "adaptive" : "16:9";
-        assert.equal(settings.aspectRatio, expected);
-        await fixture.provider.submit(request(name, { params: { prompt: "Synthetic", aspect_ratio: settings.aspectRatio, duration: settings.duration } }));
-        assert.equal(JSON.parse(fixture.calls.at(-1).body).aspect_ratio, expected);
-    }
-});
-
-test("actual VideoModelPill renders every registered video model including all four ToAPIs choices", () => {
-    const capabilities = createModuleLoader().load("src/models/capabilities/video.ts");
-    const source = fs.readFileSync(new URL("../src/components/command-bar/VideoModelPill.tsx", import.meta.url), "utf8");
-    const code = ts.transpileModule(source, { compilerOptions: {
-        module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX,
-    } }).outputText;
-    const component = { exports: {} };
-    const require = name => {
-        if (name === "@/models/capabilities/video") return capabilities;
-        if (name === "./PillPopover") return { PillPopover: ({ children }) => createElement("div", null, children) };
-        return requireDependency(name);
-    };
-    vm.runInNewContext("(function(require,module,exports){" + code + "\n})", {})(require, component, component.exports);
-    const markup = renderToStaticMarkup(createElement(component.exports.VideoModelPill, {
-        modelId: "toapis__seedance-2-5", variantId: "720p", attachments: [], onModelChange() {},
-    }));
-    const labels = Array.from(markup.matchAll(/<button\b[^>]*>[\s\S]*?<span class="truncate">([^<]+)<\/span>/g), match => match[1]);
-    for (const model of ["seedance-2", "seedance-2-fast", "seedance-2-mini", "seedance-2-5"]) {
-        assert.ok(labels.includes(`${model} - ToAPIs`), `actual picker must render ${model}`);
-    }
-    const { VIDEO_CAPABILITIES, VIDEO_CAPABILITY_GROUPS, getVideoCapabilitiesByGroup } = capabilities;
-    const models = Object.values(VIDEO_CAPABILITIES);
-    const enumeratedIds = VIDEO_CAPABILITY_GROUPS.flatMap(getVideoCapabilitiesByGroup).map(model => model.id);
-    assert.deepEqual([...enumeratedIds].sort(), Object.keys(VIDEO_CAPABILITIES).sort(), "each registered ID must occur exactly once in picker enumeration");
-    assert.deepEqual(labels.sort(), models.map(model => model.label).sort(), "the real component must render all registered model buttons");
-    for (const group of new Set(models.map(model => model.group))) assert.ok(VIDEO_CAPABILITY_GROUPS.includes(group), `missing group ${group}`);
-    assert.equal(labels.filter(label => label.endsWith(" - ToAPIs")).length, 4);
-});
-
-test("ToAPIs invalid input and missing credentials reject without dispatch or uncertainty", async () => {
-    const noKey = toapisFixture({ env: {} });
-    await assert.rejects(noKey.provider.submit(request()), e => assertError(e, { submissionUncertain: false, retryable: false }));
-    assert.equal(noKey.calls.length, 0);
-    for (const origin of ["http://toapis.com", "https://toapis.com:443", "https://toapis.com/v1", "https://evil.test", "https://toapis.com?x=1", "https://user:pass@toapis.com"]) {
-        const fixture = toapisFixture({ env: { TOAPIS_API_KEY: syntheticKey, TOAPIS_BASE_URL: origin } });
-        await assert.rejects(fixture.provider.submit(request()), e => assertError(e, { code: "ERR_TOAPIS_ORIGIN", submissionUncertain: false }));
-        assert.equal(fixture.calls.length, 0);
-    }
-    const fixture = toapisFixture();
-    const invalid = [
-        request("bad-model"), request("seedance-2-5", { params: { prompt: "x", aspect_ratio: "16:9" } }),
-        request("seedance-2", { params: { prompt: "x", aspect_ratio: "adaptive" } }),
-        request("seedance-2", { params: { prompt: "x", duration: "5" } }),
-        request("seedance-2-mini", { params: { prompt: "x", resolution: "1080p" } }),
-        request("seedance-2-fast", { params: { prompt: "x", generate_audio: true } }),
-        request("seedance-2-5", { media: {} }), request("gpt-image-2", { media: { images: { first_frame: mediaUrl } } }),
-        request("gpt-image-2", { params: { prompt: "x", resolution: "8K" } }),
-        request("seedance-2-5", { media: { images: { first_frame: mediaUrl }, video: outputUrl } }),
-        ...["https://user:pass@example.test/x", "http://example.test/x", "https://127.0.0.1/x", "https://[::1]/x", "https://example.test/" + "x".repeat(2048)].map(url => request("seedance-2-5", { media: { images: { first_frame: url } } })),
-    ];
-    for (const value of invalid) await assert.rejects(fixture.provider.submit(value), e => assertError(e, { submissionUncertain: false, retryable: false }));
-    assert.equal(fixture.calls.length, 0);
-});
-
-test("ToAPIs persisted operations are validated before GET", async () => {
-    const fixture = toapisFixture({ handler: () => json(taskResponse("queued")) });
-    const op = JSON.parse(JSON.stringify(operation("seedance-2-5")));
-    assert.equal((await fixture.provider.poll(pollRequest("seedance-2-5", { operation: op }))).status, "IN_PROGRESS");
-    assert.equal(fixture.calls[0].method, "GET");
-    assert.match(fixture.calls[0].url, /\/videos\/generations\/tsk_synthetic$/);
-    for (const change of [{ version: 2 }, { taskId: "../x" }, { taskId: "" }, { taskId: "x".repeat(201) }, { origin: "https://elsewhere.test" }, { model: "seedance-2" }, { mediaType: "image" }]) {
-        await assert.rejects(fixture.provider.poll(pollRequest("seedance-2-5", { operation: { ...op, ...change } })), e => assertError(e, { retryable: false }));
-    }
-    assert.equal(fixture.calls.length, 1);
-});
-
-test("ToAPIs known statuses and malformed completion remain distinct", async () => {
-    for (const status of ["pending", "queued", "in_progress", "failed"]) {
-        const fixture = toapisFixture({ handler: () => json(taskResponse(status, { error: { message: syntheticKey } })) });
-        const result = await fixture.provider.poll(pollRequest());
-        assert.equal(result.status, status === "failed" ? "FAILED" : "IN_PROGRESS");
-        if (status === "failed") assert.equal(result.error, "ERR_TOAPIS_TASK_FAILED");
-    }
-    for (const model of ["gpt-image-2", "seedance-2-5"]) {
-        const fixture = toapisFixture({ handler: () => json(taskResponse("completed", { result: { type: operation(model).mediaType, data: [{ url: outputUrl }] } }, model)) });
-        const result = await fixture.provider.poll(pollRequest(model));
-        assert.equal(result.status, "COMPLETED");
-        assert.equal(result.assets[0].url, outputUrl);
-    }
-    const bad = [
-        taskResponse("unknown"), taskResponse("completed", { id: "different" }),
-        taskResponse("completed", { result: { type: "image", data: [{ url: outputUrl }] } }),
-        taskResponse("completed", { result: { type: "video", data: [] } }),
-        taskResponse("completed", { result: { type: "video", data: [{ url: outputUrl }, { url: outputUrl }] } }),
-        taskResponse("completed", { result: { type: "video", data: [{ url: "https://u:p@example.test/x" }] } }),
-        taskResponse("completed", { result: { type: "video", data: [{ url: outputUrl, format: "mov" }] } }),
-    ];
-    for (const response of bad) {
-        const fixture = toapisFixture({ handler: () => json(response) });
-        await assert.rejects(fixture.provider.poll(pollRequest()), e => assertError(e, { retryable: false, submissionUncertain: false }));
-    }
-});
-
+// Expanded model catalogs and parameter contracts are covered by the provider-specific
+// suites: verify-toapis-models.mjs, verify-google-models.mjs and verify-gateway-models.mjs.
 test("ToAPIs transient queries preserve Retry-After; submit is one attempt and uncertain where appropriate", async () => {
     for (const status of [408, 429, 500, 503]) {
         const fixture = toapisFixture({ handler: () => json({ secret: syntheticKey }, status, { "retry-after": "37" }) });
@@ -251,13 +93,13 @@ function sdkFixture(kind, handler, mocks = {}) {
         return handler(call, calls.length);
     };
     const modules = createModuleLoader({ env, globals: { fetch, Uint8Array }, mocks: { "@google/genai": googleSdk, ai: aiSdk, ...mocks } });
-    const provider = kind === "gateway" ? new (modules.load("src/providers/vercel-ai-gateway.ts").VercelAiGatewayProvider)()
-        : new (modules.load("src/providers/google.ts").GoogleProvider)(kind === "vertex" ? "google-vertex" : "google-ai-studio");
+    const provider = kind === "gateway" ? new (modules.load("src/server/providers/vercel-ai-gateway.ts").VercelAiGatewayProvider)()
+        : new (modules.load("src/server/providers/google.ts").GoogleProvider)(kind === "vertex" ? "google-vertex" : "google-ai-studio");
     return { ...modules, calls, provider };
 }
 function sdkRequest(kind, overrides = {}) {
     const mediaType = kind === "interactions" ? "image" : "video";
-    return { mediaType, modelId: "synthetic", providerModelId: mediaType === "image" ? "gemini-3-pro-image-preview" : kind === "gateway" ? "google/veo-3.1-generate-preview" : "veo-3.1-generate-preview",
+    return { mediaType, modelId: "synthetic", providerModelId: mediaType === "image" ? "gemini-3-pro-image-preview" : kind === "gateway" ? "google/veo-3.1-generate-001" : "veo-3.1-generate-preview",
         capabilities: {}, params: { model_id: "synthetic", prompt: "Synthetic scene" }, media: {}, ...overrides };
 }
 
@@ -343,33 +185,8 @@ test("installed SDK malformed successful status responses pause instead of inven
     }
 });
 
-test("actual video route carries adaptive from FormData into the real ToAPIs payload", async () => {
-    const calls = [];
-    let provider;
-    const modules = createModuleLoader({ env: { TOAPIS_API_KEY: syntheticKey }, globals: { fetch: async (url, init) => {
-        calls.push({ url, ...init }); return json(taskResponse("queued"));
-    } }, mocks: {
-        "next/server": { NextResponse: { json: (body, init) => json(body, init?.status) } },
-        "@/lib/media-upload": { resolveUrl: async url => ({ remoteUrl: url }) },
-        "@/lib/generation-service": { submitGeneration: async input => {
-            const submitted = await provider.submit({ ...input, providerModelId: input.capabilities.provider_model_id, clientTaskId: "local-test-id" });
-            return { task_id: submitted.providerTaskId, httpStatus: 202, accepted: true, recovery_required: false };
-        } },
-    } });
-    provider = new (modules.load("src/providers/toapis.ts").ToapisProvider)();
-    const route = modules.load("src/app/api/generate/route.ts");
-    const body = new FormData();
-    body.set("model_id", "toapis__seedance-2-5"); body.set("prompt", "Synthetic scene");
-    body.set("settings", JSON.stringify({ duration: "4", aspectRatio: "adaptive" }));
-    body.set("variant_id", "720p"); body.set("url_first_frame", mediaUrl);
-    const response = await route.POST(new Request("http://localhost/api/generate", { method: "POST", body, headers: { origin: "http://localhost" } }));
-    assert.equal(response.status, 202);
-    assert.equal(calls.length, 1);
-    assert.equal(JSON.parse(calls[0].body).aspect_ratio, "adaptive");
-});
-
 test("Retry-After parsing keeps long provider delays and rejects malformed values", () => {
-    const { parseRetryAfter } = createModuleLoader().load("src/providers/request-error.ts");
+    const { parseRetryAfter } = createModuleLoader().load("src/server/providers/request-error.ts");
     assert.equal(parseRetryAfter("86400"), 86_400_000);
     assert.equal(parseRetryAfter("0"), 0);
     assert.equal(parseRetryAfter("-1"), undefined);
@@ -473,10 +290,10 @@ test("all Google submission paths set their own no-retry options and media/poll 
     }
     const fixture = sdkFixture("native", () => { throw new Error("Unexpected network"); }, {
         "@google/genai": { GoogleGenAI, GenerateVideosOperation: class {} },
-        "./utils": { getMediaUrls: () => [mediaUrl], getImageUrl: () => mediaUrl, toSerializable: plain,
+        "@/server/providers/utils": { getMediaUrls: () => [mediaUrl], getImageUrl: () => mediaUrl, toSerializable: plain,
             fetchMedia: async (url, options) => { downloads.push(options); return { data: Buffer.from([1]), mimeType: "image/png" }; } },
     });
-    const Provider = fixture.load("src/providers/google.ts").GoogleProvider;
+    const Provider = fixture.load("src/server/providers/google.ts").GoogleProvider;
     const controller = new AbortController();
     await new Provider("google-ai-studio").submit(sdkRequest("interactions", { signal: controller.signal }));
     await new Provider("google-vertex").submit(sdkRequest("interactions", { signal: controller.signal }));
@@ -494,7 +311,7 @@ test("all Google submission paths set their own no-retry options and media/poll 
     assert.equal(videos[0].options.generateAudio, undefined);
     assert.equal(videos[1].options.generateAudio, false);
     for (const video of videos) { assert.ok(video.body.source.prompt); assert.equal(video.body.prompt, undefined); assert.equal(video.body.image, undefined); }
-    const caps = fixture.load("src/models/capabilities/external.ts").EXTERNAL_VIDEO_CAPABILITIES;
+    const caps = fixture.load("src/server/catalog/external.ts").EXTERNAL_VIDEO_CAPABILITIES;
     assert.equal(caps["google-ai-studio__veo-3.1-generate-preview"].custom_fields.some(field => field.id === "generate_audio"), false);
     assert.equal(caps["google-vertex__veo-3.1-generate-001"].custom_fields.some(field => field.id === "generate_audio"), true);
 });
@@ -509,7 +326,7 @@ test("Gateway image and language-image paths explicitly disable retries and carr
     const fixture = sdkFixture("gateway", () => { throw new Error("Unexpected fetch"); }, { ai: fakeAi });
     const controller = new AbortController();
     for (const providerMode of ["image-model", "language-image"]) {
-        await fixture.provider.submit(sdkRequest("gateway", { mediaType: "image", providerMode, signal: controller.signal }));
+        await fixture.provider.submit(sdkRequest("gateway", { mediaType: "image", providerMode, providerModelId: providerMode === "image-model" ? "openai/gpt-image-2" : "google/gemini-3-pro-image", signal: controller.signal }));
     }
     assert.equal(seen.length, 2);
     for (const call of seen) { assert.equal(call.maxRetries, 0); assert.ok(call.abortSignal instanceof AbortSignal); }
@@ -518,31 +335,43 @@ test("Gateway image and language-image paths explicitly disable retries and carr
     assert.equal(seen.every(call => call.abortSignal.aborted), true);
 });
 
-test("Freepik existing adapter preserves status/error semantics and validates operations", async () => {
+test("Magnific preserves status/error semantics and rejects legacy operations without dispatch", async () => {
     const calls = [];
-    let response = json({ data: { task_id: "test-id" } });
-    const modules = createModuleLoader({ env: { FREEPIK_API_KEY: syntheticKey }, globals: { fetch: async (url, init) => { calls.push({ url, ...init }); return response; } },
-        mocks: { "@/models/adapters/image": { getImageAdapter: () => ({ process: () => ({ endpoint: { post_path: "/v1/ai/mystic", poll_path: "/v1/ai/mystic/{task_id}" }, payload: {} }) }) },
-            "@/models/adapters/video": { getVideoAdapter: () => undefined } } });
-    const provider = new (modules.load("src/providers/freepik.ts").FreepikProvider)();
-    const accepted = await provider.submit(request("gpt-image-2"));
+    let response = json({ data: { task_id: "test-id", status: "IN_PROGRESS" } });
+    const modules = createModuleLoader({ env: { MAGNIFIC_API_KEY: syntheticKey }, globals: { fetch: async (url, init) => { calls.push({ url: String(url), ...init }); return response; } } });
+    const provider = new (modules.load("src/server/providers/magnific-provider.ts").MagnificProvider)();
+    const modelId = "magnific__text_to_image__nano_banana_2_1";
+    const capabilities = modules.load("src/server/catalog/magnific.ts").MAGNIFIC_IMAGE_CAPABILITIES[modelId];
+    const input = { mediaType: "image", modelId, providerModelId: capabilities.provider_model_id, capabilities,
+        params: { model_id: modelId, prompt: "synthetic", field_values: { resolution: "1K", aspect_ratio: "1:1" } }, media: {} };
+    const accepted = await provider.submit(input);
     const poll = { mediaType: "image", operation: accepted.operation };
     assert.equal(calls[0].redirect, "error");
     assert.equal(accepted.providerTaskId, "test-id");
+    assert.ok(calls[0].url.startsWith("https://api.magnific.com/"));
+    assert.equal(calls[0].headers["x-magnific-api-key"], syntheticKey);
+    assert.equal(calls[0].headers["x-freepik-api-key"], undefined);
     response = json({ data: { status: "COMPLETED", generated: [outputUrl] } });
     assert.equal((await provider.poll(poll)).status, "COMPLETED");
+    response = json({ data: { status: "COMPLETED", generated: [outputUrl] } });
+    assert.equal((await provider.poll({ ...poll, mediaType: "video" })).assets[0].mimeType, "video/mp4");
+    response = json({ data: { task_status: "PENDING" } });
+    assert.equal((await provider.poll(poll)).status, "IN_PROGRESS");
     response = json({ data: { status: "FAILED", error: { message: syntheticKey } } });
-    assert.equal((await provider.poll(poll)).error, "ERR_FREEPIK_TASK_FAILED");
+    assert.equal((await provider.poll(poll)).error, "ERR_MAGNIFIC_TASK_FAILED");
     response = json({}, 503, { "retry-after": "9" });
     await assert.rejects(provider.poll(poll), e => assertError(e, { retryable: true, retryAfterMs: 9000, submissionUncertain: false }));
     response = json({ data: { status: "COMPLETED", generated: [] } });
     await assert.rejects(provider.poll(poll), e => assertError(e, { retryable: false }));
     const before = calls.length;
     for (const pollUrl of ["https://evil.test/x", "/v1/ai/../x", "/v1/ai/x?secret=1"]) {
-        await assert.rejects(provider.poll({ ...poll, operation: { pollUrl } }), e => assertError(e, { retryable: false }));
+        await assert.rejects(provider.poll({ ...poll, operation: { pollUrl, api: "magnific" } }), e => assertError(e, { retryable: false }));
+    }
+    for (const api of ["legacy", undefined]) {
+        await assert.rejects(provider.poll({ ...poll, operation: { ...accepted.operation, api } }), /ERR_MAGNIFIC_OPERATION/);
     }
     assert.equal(calls.length, before);
     response = json({}, 503);
-    await assert.rejects(provider.submit(request("gpt-image-2")), e => assertError(e, { submissionUncertain: true }));
+    await assert.rejects(provider.submit(input), e => assertError(e, { submissionUncertain: true }));
     assert.equal(calls.length, before + 1);
 });

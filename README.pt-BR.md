@@ -5,7 +5,7 @@
 
   **A alternativa open source e multiprovedor ao Higgsfield para gerar imagens e vídeos com IA.**
 
-  Gere com modelos da Freepik, Gemini, Google Vertex AI e Vercel AI Gateway em um único estúdio criativo.
+  Gere com modelos da Magnific, Gemini, Google Vertex AI e Vercel AI Gateway em um único estúdio criativo.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Demo ao vivo</strong></a>
@@ -41,7 +41,7 @@
 Modelos de mídia generativa estão espalhados entre provedores, painéis e controles incompatíveis. O Open-Higgsfield reúne tudo em um único workspace visual:
 
 - **Gere imagens e vídeos no mesmo estúdio** sem trocar de produto.
-- **Escolha entre 40 modelos selecionados** da Freepik, Google AI Studio, Vertex AI e Vercel AI Gateway.
+- **Escolha modelos de imagem e vídeo** do Magnific, Google AI Studio, Vertex AI e Vercel AI Gateway.
 - **Use os controles certos para cada modelo**: proporção, resolução, duração, seed, CFG, segurança e áudio.
 - **Trabalhe com referências naturalmente** em fluxos image-to-image, image-to-video, primeiro/último frame, vídeo e áudio.
 - **Troque de provedor sem reaprender a interface** com tarefas, progresso, erros e resultados normalizados.
@@ -61,10 +61,11 @@ Modelos de mídia generativa estão espalhados entre provedores, painéis e cont
 
 | Provedor | Imagens | Vídeos | Autenticação |
 | --- | ---: | ---: | --- |
-| Freepik | 7 | 16 | `FREEPIK_API_KEY` |
-| Google AI Studio | 3 | 1 | `GEMINI_API_KEY` |
-| Google Vertex AI | 2 | 1 | Credenciais do Google Cloud |
-| Vercel AI Gateway | 5 | 5 | `AI_GATEWAY_API_KEY` |
+| Magnific | 50 | 117 | `MAGNIFIC_API_KEY` |
+| Google AI Studio | 5 | 2 | `GEMINI_API_KEY` |
+| Google Vertex AI | 4 | 4 | Credenciais do Google Cloud |
+| Vercel AI Gateway | 45 | 39 | `AI_GATEWAY_API_KEY` |
+| ToAPIs | 51 | 53 | `TOAPIS_API_KEY` |
 
 O catálogo inclui Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image e OmniHuman. Disponibilidade, preço, cotas e acesso preview são controlados por cada provedor.
 
@@ -92,7 +93,7 @@ Veja [Provedores e modelos](docs/providers.md) para credenciais e instruções d
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06b6d4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?logo=vercel)](https://vercel.com/)
 
-Next.js App Router, React 19, TypeScript strict, Tailwind CSS 4, Framer Motion, Freepik API, Google Gen AI SDK, Vertex AI e Vercel AI Gateway.
+Next.js App Router, React 19, TypeScript strict, Tailwind CSS 4, Framer Motion, Magnific API, Google Gen AI SDK, Vertex AI e Vercel AI Gateway.
 
 ## Arquitetura
 
@@ -101,7 +102,7 @@ flowchart LR
     U[Workspace criativo] --> C[Capacidades do modelo]
     C --> A[API de geração]
     A --> R[Registro de provedores]
-    R --> F[Freepik]
+    R --> F[Magnific]
     R --> G[Google AI Studio]
     R --> V[Vertex AI]
     R --> W[Vercel AI Gateway]
@@ -134,7 +135,7 @@ npm run dev
 Configure somente os provedores que deseja usar:
 
 ```dotenv
-FREEPIK_API_KEY=
+MAGNIFIC_API_KEY=
 GEMINI_API_KEY=
 GOOGLE_CLOUD_PROJECT=
 GOOGLE_CLOUD_LOCATION=global
@@ -144,6 +145,12 @@ CLOUDINARY_URL=
 ```
 
 Abra [http://localhost:3000](http://localhost:3000). Nunca use `NEXT_PUBLIC_` em credenciais de provedores.
+
+Depois de iniciar, abra `/pt-BR/settings`, `/en/settings` ou `/es/settings` para cadastrar
+uma ou mais conexões criptografadas, testar provedores, ativar ou desativar
+modelos, sincronizar IDs do Gateway e salvar contratos de modelos customizados.
+Defina `PROVIDER_CONFIG_ENCRYPTION_KEY` antes de salvar conexões. As chaves do
+`.env` continuam funcionando como fallback.
 
 O desenvolvimento escuta em `127.0.0.1`. Sem credenciais, mantenha o servidor local; configure senha e origem HTTPS antes de expor outro ambiente.
 
@@ -156,7 +163,13 @@ docker compose up --build
 
 ## Deploy na Vercel
 
-Produção exige credencial do operador, origem HTTPS, PostgreSQL migrado, mídia pública no Cloudinary e execução recorrente. O cron por minuto incluído exige Vercel Pro ou Enterprise. Novas gerações ficam desativadas até configurar `GENERATION_ENABLED=true`.
+Cada deploy é um workspace BYOK de um operador. Se a URL for compartilhada,
+os visitantes usam as credenciais e a cota desse deploy; não há isolamento por
+usuário, orçamento monetário por aplicação ou limite global. Produção exige
+credencial do operador, origem HTTPS, PostgreSQL migrado, mídia pública no
+Cloudinary e execução recorrente. O cron por minuto incluído exige Vercel Pro
+ou Enterprise. Novas gerações ficam desativadas até configurar
+`GENERATION_ENABLED=true`.
 
 Este é um espaço compartilhado: quem tem a credencial acessa todas as tarefas e usa as mesmas contas dos provedores. Não há isolamento por usuário, orçamento monetário ou limite global de requisições no aplicativo. Configure cotas dos provedores e proteção na entrada. Arquivos do Cloudinary continuam públicos por URL.
 
@@ -169,9 +182,13 @@ Siga o [guia de operação](docs/production.md) antes de iniciar Docker ou publi
 | `npm run dev` | Inicia o servidor de desenvolvimento |
 | `npm run lint` | Executa o ESLint |
 | `npm run typecheck` | Verifica o TypeScript |
+| `npm test` | Executa testes de unidade e integração |
+| `npm run test:e2e` | Executa testes isolados de navegador e acessibilidade |
 | `npm run build` | Cria o build de produção |
-| `npm run check` | Executa lint, typecheck e build |
+| `npm run check` | Executa auditoria, lint, typecheck, testes, build e testes de navegador |
 | `npm start` | Serve o build de produção |
+
+Configuração e isolamento dos testes de navegador: [Verificação](docs/architecture.md#verification).
 
 ## Documentação
 
@@ -187,7 +204,7 @@ Leia [CONTRIBUTING.md](CONTRIBUTING.md), crie uma branch focada, execute `npm ru
 
 ## Segurança e aviso legal
 
-Não relate vulnerabilidades em issues públicas. Open-Higgsfield é independente e não é afiliado à Higgsfield AI, Freepik, Google, Vercel ou provedores de modelos. Você é responsável por custos, conteúdo gerado, segurança e conformidade.
+Não relate vulnerabilidades em issues públicas. Open-Higgsfield é independente e não é afiliado à Higgsfield AI, Magnific, Google, Vercel ou provedores de modelos. Você é responsável por custos, conteúdo gerado, segurança e conformidade.
 
 ## Licença
 

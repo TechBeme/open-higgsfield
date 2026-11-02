@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listTasks } from "@/lib/task-store";
-import { safeErrorCode } from "@/lib/task-runtime";
-import { guardWorkspaceRequest } from "@/lib/workspace-access";
+import { listTasks } from "@/server/tasks/store";
+import { safeErrorCode } from "@/server/tasks/runtime";
+import { guardWorkspaceRequest } from "@/server/security/workspace-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

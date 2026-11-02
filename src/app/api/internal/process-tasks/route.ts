@@ -1,6 +1,6 @@
-import { applyWorkspaceHeaders, guardSchedulerRequest, accessFailure } from "@/lib/workspace-access";
-import { assertRuntimeConfiguration } from "@/lib/production-config";
-import { assertEmptyBody, requestFailure } from "@/lib/request-limits";
+import { applyWorkspaceHeaders, guardSchedulerRequest, accessFailure } from "@/server/security/workspace-access";
+import { assertRuntimeConfiguration } from "@/server/config/production";
+import { assertEmptyBody, requestFailure } from "@/server/http/request-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     try {
         const { workerMode } = assertRuntimeConfiguration();
         if (workerMode !== "external") return accessFailure("ERR_SCHEDULER_CONFIG", 503);
-        const { processDueTasks } = await import("@/lib/poller");
+        const { processDueTasks } = await import("@/server/tasks/poller");
         const result = await processDueTasks({ limit: 10, budgetMs: 50_000 });
         console.info("[task-scheduler] completed", { duration_ms: Date.now() - started, ...result });
         return applyWorkspaceHeaders(Response.json(result));

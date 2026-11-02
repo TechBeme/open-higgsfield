@@ -10,7 +10,7 @@ function history(fetch = async () => Response.json([])) {
         swr: { mutate: async (key) => { calls.push(key); } },
         "swr/infinite": { __esModule: true, default: () => { throw new Error("Hooks require rendered browser acceptance"); }, unstable_serialize: (getKey) => `$inf$${getKey(0, null)}` },
     } });
-    return { api: loader.load("@/hooks/useTaskHistory"), calls };
+    return { api: loader.load("@/features/tasks/hooks/useTaskHistory"), calls };
 }
 
 test("cursor keys stop at final page and global revalidation targets the native infinite cache", async () => {

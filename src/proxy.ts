@@ -1,7 +1,7 @@
 import createMiddleware from "next-intl/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import { routing } from "@/i18n/routing";
-import { applyWorkspaceHeaders, guardSchedulerRequest, guardWorkspaceRequest } from "@/lib/workspace-access";
+import { applyWorkspaceHeaders, guardSchedulerRequest, guardWorkspaceRequest } from "@/server/security/workspace-access";
 
 const localize = createMiddleware(routing);
 

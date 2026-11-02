@@ -5,7 +5,7 @@
 
   **La alternativa open source y multiproveedor a Higgsfield para generar imágenes y videos con IA.**
 
-  Genera con modelos de Freepik, Gemini, Google Vertex AI y Vercel AI Gateway desde un único estudio creativo.
+  Genera con modelos de Magnific, Gemini, Google Vertex AI y Vercel AI Gateway desde un único estudio creativo.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Demo en vivo</strong></a>
@@ -41,7 +41,7 @@
 Los modelos de medios generativos están repartidos entre proveedores, paneles y controles incompatibles. Open-Higgsfield los reúne en un único espacio visual:
 
 - **Genera imágenes y videos en el mismo estudio** sin cambiar de producto.
-- **Elige entre 40 modelos seleccionados** de Freepik, Google AI Studio, Vertex AI y Vercel AI Gateway.
+- **Elige modelos de imagen y vídeo** de Magnific, Google AI Studio, Vertex AI y Vercel AI Gateway.
 - **Usa los controles correctos para cada modelo**: aspecto, resolución, duración, seed, CFG, seguridad y audio.
 - **Trabaja naturalmente con referencias** mediante image-to-image, image-to-video, fotograma inicial/final, video y audio.
 - **Cambia de proveedor sin reaprender la interfaz** con tareas, progreso, errores y resultados normalizados.
@@ -61,10 +61,11 @@ Los modelos de medios generativos están repartidos entre proveedores, paneles y
 
 | Proveedor | Imágenes | Videos | Autenticación |
 | --- | ---: | ---: | --- |
-| Freepik | 7 | 16 | `FREEPIK_API_KEY` |
-| Google AI Studio | 3 | 1 | `GEMINI_API_KEY` |
-| Google Vertex AI | 2 | 1 | Credenciales de Google Cloud |
-| Vercel AI Gateway | 5 | 5 | `AI_GATEWAY_API_KEY` |
+| Magnific | 50 | 117 | `MAGNIFIC_API_KEY` |
+| Google AI Studio | 5 | 2 | `GEMINI_API_KEY` |
+| Google Vertex AI | 4 | 4 | Credenciales de Google Cloud |
+| Vercel AI Gateway | 45 | 39 | `AI_GATEWAY_API_KEY` |
+| ToAPIs | 51 | 53 | `TOAPIS_API_KEY` |
 
 El catálogo incluye Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image y OmniHuman. La disponibilidad, los precios, las cuotas y el acceso preview dependen de cada proveedor.
 
@@ -92,7 +93,7 @@ Consulta [Proveedores y modelos](docs/providers.md) para credenciales e instrucc
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06b6d4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?logo=vercel)](https://vercel.com/)
 
-Next.js App Router, React 19, TypeScript estricto, Tailwind CSS 4, Framer Motion, Freepik API, Google Gen AI SDK, Vertex AI y Vercel AI Gateway.
+Next.js App Router, React 19, TypeScript estricto, Tailwind CSS 4, Framer Motion, Magnific API, Google Gen AI SDK, Vertex AI y Vercel AI Gateway.
 
 ## Arquitectura
 
@@ -101,7 +102,7 @@ flowchart LR
     U[Espacio creativo] --> C[Capacidades del modelo]
     C --> A[API de generación]
     A --> R[Registro de proveedores]
-    R --> F[Freepik]
+    R --> F[Magnific]
     R --> G[Google AI Studio]
     R --> V[Vertex AI]
     R --> W[Vercel AI Gateway]
@@ -134,7 +135,7 @@ npm run dev
 Configura únicamente los proveedores que quieras usar:
 
 ```dotenv
-FREEPIK_API_KEY=
+MAGNIFIC_API_KEY=
 GEMINI_API_KEY=
 GOOGLE_CLOUD_PROJECT=
 GOOGLE_CLOUD_LOCATION=global
@@ -144,6 +145,10 @@ CLOUDINARY_URL=
 ```
 
 Abre [http://localhost:3000](http://localhost:3000). Nunca uses `NEXT_PUBLIC_` para credenciales de proveedores.
+
+La interfaz está disponible en inglés, portugués y español. Cambia el idioma
+desde la barra superior. Abre `/es/settings`, `/en/settings` o `/pt-BR/settings`
+para gestionar tus conexiones y los modelos visibles en el Estudio.
 
 El desarrollo escucha en `127.0.0.1`. Sin credenciales, mantén el servidor local; configura una contraseña y un origen HTTPS antes de exponer otro entorno.
 
@@ -169,9 +174,13 @@ Sigue la [guía de operación](docs/production.md) antes de iniciar Docker o pub
 | `npm run dev` | Inicia el servidor de desarrollo |
 | `npm run lint` | Ejecuta ESLint |
 | `npm run typecheck` | Comprueba TypeScript |
+| `npm test` | Ejecuta pruebas unitarias y de integración |
+| `npm run test:e2e` | Ejecuta pruebas aisladas de navegador y accesibilidad |
 | `npm run build` | Crea el build de producción |
-| `npm run check` | Ejecuta lint, typecheck y build |
+| `npm run check` | Ejecuta auditoría, lint, typecheck, pruebas, build y pruebas de navegador |
 | `npm start` | Sirve el build de producción |
+
+Configuración y aislamiento de las pruebas de navegador: [Verificación](docs/architecture.md#verification).
 
 ## Documentación
 
@@ -187,7 +196,7 @@ Lee [CONTRIBUTING.md](CONTRIBUTING.md), crea una rama enfocada, ejecuta `npm run
 
 ## Seguridad y aviso legal
 
-No informes vulnerabilidades en issues públicas. Open-Higgsfield es independiente y no está afiliado a Higgsfield AI, Freepik, Google, Vercel ni proveedores de modelos. Eres responsable de los costes, el contenido generado, la seguridad y el cumplimiento legal.
+No informes vulnerabilidades en issues públicas. Open-Higgsfield es independiente y no está afiliado a Higgsfield AI, Magnific, Google, Vercel ni proveedores de modelos. Eres responsable de los costes, el contenido generado, la seguridad y el cumplimiento legal.
 
 ## Licencia
 

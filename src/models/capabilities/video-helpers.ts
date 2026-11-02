@@ -172,5 +172,5 @@ export function isAudioRequired(caps: ModelCapabilities): boolean {
 export function hasAttachments(caps: ModelCapabilities): boolean {
     const ov = OVERRIDES[caps.id];
     if (ov?.attachment_roles?.length) return true;
-    return caps.media_slots.some(s => s.kind === "image" || s.kind === "video");
+    return caps.media_slots.some(s => s.kind === "image" || s.kind === "video" || s.kind === "audio");
 }

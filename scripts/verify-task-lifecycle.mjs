@@ -5,10 +5,10 @@ import path from "node:path";
 import os from "node:os";
 import { createModuleLoader } from "./test-module-loader.mjs";
 
-const caps = { id: "synthetic", provider: "freepik", provider_model_id: "synthetic", media_slots: [], prompt_required: true };
+const caps = { id: "synthetic", provider: "google-ai-studio", provider_model_id: "synthetic", media_slots: [], prompt_required: true };
 const input = (mediaType = "image") => ({ mediaType, modelId: "synthetic", capabilities: caps, params: { prompt: "synthetic lamp" }, media: {} });
 const fixture = (id, extra = {}) => ({ task_id: id, media_type: "image", model_id: "synthetic", status: "IN_PROGRESS",
-    created_at: new Date().toISOString(), provider_id: "freepik", provider_operation: { pollUrl: `/synthetic/${id}` },
+    created_at: new Date().toISOString(), provider_id: "google-ai-studio", provider_operation: { pollUrl: `/synthetic/${id}` },
     lifecycle_phase: "polling", next_poll_at: new Date(Date.now() - 1_000).toISOString(),
     deadline_at: new Date(Date.now() + 86_400_000).toISOString(), poll_failures: 0,
     lease_token: null, lease_expires_at: null, deleted_at: null, ...extra });
@@ -22,8 +22,8 @@ async function harness(t, options = {}) {
         poll: async (request) => { state.pollCalls++; return options.poll ? options.poll(request) : { status: "IN_PROGRESS" }; },
     };
     const mocks = {
-        "@/providers/registry": { resolveProvider: () => ({ provider, providerId: "freepik", providerModelId: "synthetic" }), getProvider: () => provider },
-        "@/lib/generated-assets": { attachGeneratedAssets: async (task, assets, transferOptions) => {
+        "@/server/providers/registry": { resolveProvider: () => ({ provider, providerId: "google-ai-studio", providerModelId: "synthetic" }), getProvider: () => provider },
+        "@/server/media/generated-assets": { attachGeneratedAssets: async (task, assets, transferOptions) => {
             state.attachCalls++;
             assert.ok(transferOptions.signal);
             if (options.attach) return options.attach(task, assets);
@@ -33,21 +33,19 @@ async function harness(t, options = {}) {
         "node:fs/promises": { ...fs, rename: (...args) => state.failWrites ? Promise.reject(new Error("synthetic disk failure")) : fs.rename(...args) },
         "next/server": { NextResponse: Response },
         // T5 separately exercises real authorization/configuration. Keep its real body parser here.
-        "@/lib/workspace-access": { guardWorkspaceRequest: () => null,
+        "@/server/security/workspace-access": { guardWorkspaceRequest: () => null,
             accessFailure: (error, status) => Response.json({ error, accepted: false, recovery_required: false }, { status }) },
-        "@/lib/production-config": { assertGenerationEnabled: () => {} },
-        "@/models/capabilities/video": { VIDEO_CAPABILITIES: { synthetic: caps } },
-        "@/models/capabilities/image": { IMAGE_CAPABILITIES: { synthetic: caps } },
-        "@/models/adapters/video": { getVideoAdapter: () => ({ validate: () => [] }) },
-        "@/models/adapters/image": { getImageAdapter: () => ({ validate: () => [] }) },
-        "@/lib/upload": { saveInputLocally: async () => { throw new Error("No real uploads in tests"); }, uploadToTmpfiles: async () => { throw new Error("No real uploads in tests"); } },
-        "@/lib/media-upload": { processImageUpload: async () => { throw new Error("No real uploads in tests"); } },
+        "@/server/config/production": { assertGenerationEnabled: () => {} },
+        "@/server/catalog/video": { VIDEO_CAPABILITIES: { synthetic: caps } },
+        "@/server/catalog/image": { IMAGE_CAPABILITIES: { synthetic: caps } },
+        "@/server/media/storage": { saveInputLocally: async () => { throw new Error("No real uploads in tests"); }, uploadToTmpfiles: async () => { throw new Error("No real uploads in tests"); } },
+        "@/server/media/input-upload": { processImageUpload: async () => { throw new Error("No real uploads in tests"); } },
         ...options.mocks,
     };
     const loader = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: dir, TASK_WORKER_MODE: "external", ...options.env }, mocks, globals: options.globals });
-    const store = loader.load("@/lib/task-store");
-    if (options.wrapStore) mocks["@/lib/task-store"] = options.wrapStore(store);
-    return { dir, state, store, loader, service: loader.load("@/lib/generation-service"), poller: loader.load("@/lib/poller") };
+    const store = loader.load("@/server/tasks/store");
+    if (options.wrapStore) mocks["@/server/tasks/store"] = options.wrapStore(store);
+    return { dir, state, store, loader, service: loader.load("@/server/generation/service"), poller: loader.load("@/server/tasks/poller") };
 }
 
 async function due(store, id) {
@@ -255,7 +253,7 @@ test("an SDK ignoring cancellation cannot publish a late result after the worker
 });
 
 test("cancellation before the dispatch microtask prevents invoking an abort-ignoring provider", async () => {
-    const runtime = createModuleLoader().load("@/lib/task-runtime");
+    const runtime = createModuleLoader().load("@/server/tasks/runtime");
     const controller = new AbortController();
     let calls = 0;
     const pending = runtime.withSignal(controller.signal, async () => { calls++; return "billable"; });
@@ -270,17 +268,17 @@ test("worker deadline covers stalled claims and materialization/recovery writes"
         const starts = []; let attachments = 0; let origin;
         const task = { ...fixture("slow-storage"), revision: 2, lease_token: "test", lease_expires_at: new Date(Date.now() + 120_000).toISOString() };
         const loader = createModuleLoader({ env: { TASK_WORKER_MODE: "external" }, mocks: {
-            "@/lib/task-store": {
+            "@/server/tasks/store": {
                 claimTask: async (_token, _lease, _id, options) => { assert.ok(options.signal); await wait(stage === "claim" ? 1_400 : 10); return task; },
                 updateTask: async (value, options) => { assert.ok(options.signal); starts.push(performance.now() - origin); await wait(600); return { ...value, revision: value.revision + 1 }; },
             },
-            "@/providers/registry": { getProvider: () => ({ poll: async () => {
+            "@/server/providers/registry": { getProvider: () => ({ poll: async () => {
                 await wait(800); if (stage === "recovery") throw new TypeError("synthetic timeout");
                 return { status: "COMPLETED", assets: [{ url: "https://synthetic.invalid/result" }] };
             } }) },
-            "@/lib/generated-assets": { attachGeneratedAssets: async () => { attachments++; } },
+            "@/server/media/generated-assets": { attachGeneratedAssets: async () => { attachments++; } },
         } });
-        const poller = loader.load("@/lib/poller");
+        const poller = loader.load("@/server/tasks/poller");
         origin = performance.now();
         const result = await poller.processDueTasks({ budgetMs: 1_000, limit: 1 });
         assert.ok(performance.now() - origin < 1_200, `worker exceeded shared budget in ${stage}`);
@@ -301,10 +299,10 @@ test("database schema and claim share cancellation even when the transport ignor
                 if (sql.startsWith("SELECT version") && stage === "claim") return [{ version: 2 }];
                 await wait(1_400); return sql.startsWith("SELECT version") ? [{ version: 2 }] : [];
             } }) },
-            "@/providers/registry": { getProvider: () => ({ poll: async () => { polls++; return { status: "IN_PROGRESS" }; } }) },
-            "@/lib/generated-assets": { attachGeneratedAssets: async () => {} },
+            "@/server/providers/registry": { getProvider: () => ({ poll: async () => { polls++; return { status: "IN_PROGRESS" }; } }) },
+            "@/server/media/generated-assets": { attachGeneratedAssets: async () => {} },
         } });
-        const poller = loader.load("@/lib/poller"); const started = performance.now();
+        const poller = loader.load("@/server/tasks/poller"); const started = performance.now();
         await poller.processDueTasks({ budgetMs: 1_000, limit: 1 });
         assert.ok(performance.now() - started < 1_200);
         await wait(500);
@@ -376,8 +374,8 @@ test("real SSE route reads refreshed durable status, omits media bodies and clea
 
 test("generation preprocessing rejects invalid JSON/counts and classifies failures without dispatch", async (t) => {
     const mediaCaps = { ...caps, elements: true, media_slots: [{ id: "reference", kind: "image", label: "Reference" }] };
-    const catalog = { "@/models/capabilities/video": { VIDEO_CAPABILITIES: { synthetic: mediaCaps } },
-        "@/models/capabilities/image": { IMAGE_CAPABILITIES: { synthetic: mediaCaps } } };
+    const catalog = { "@/server/catalog/video": { VIDEO_CAPABILITIES: { synthetic: mediaCaps } },
+        "@/server/catalog/image": { IMAGE_CAPABILITIES: { synthetic: mediaCaps } } };
     for (const [route, field] of [["generate", "settings"], ["generate-image", "field_values"]]) {
         for (const raw of ["null", "[]", "42", '"string"', "{malformed", ...(field === "settings" ? ['{"fieldValues":null}'] : [])]) {
             const h = await harness(t, { mocks: catalog }); const form = new FormData();
@@ -389,22 +387,15 @@ test("generation preprocessing rejects invalid JSON/counts and classifies failur
     for (const values of [{ elem_count: "1000" }, { elem_count: "Infinity" }, { elem_count: "1e3" }, { elem_count: "-1" },
         { elem_count: "1.5" }, { elem_count: "2", elem_1_ref_count: "1000" }, { elem_count: "1", elem_0_ref_count: "4" }]) {
         let uploads = 0;
-        const h = await harness(t, { mocks: { ...catalog, "@/lib/media-upload": { processImageUpload: async () => { uploads++; return { remoteUrl: "https://synthetic.invalid/a" }; } } } });
+        const h = await harness(t, { mocks: { ...catalog, "@/server/media/input-upload": { processImageUpload: async () => { uploads++; return { remoteUrl: "https://synthetic.invalid/a" }; } } } });
         const form = new FormData(); form.set("model_id", "synthetic"); form.set("prompt", "synthetic");
         form.set("file_reference", new File(["x"], "synthetic.png", { type: "image/png" }));
         for (const [key, value] of Object.entries(values)) form.set(key, value);
         const response = await h.loader.load("src/app/api/generate/route.ts").POST(new Request("http://localhost/api/generate", { method: "POST", body: form }));
         assert.equal(response.status, 400); assert.equal(uploads, 0); assert.equal(h.state.submitCalls, 0);
     }
-    for (const [code, status] of [["private raw failure", 400], ["ERR_MEDIA_TOO_LARGE", 413], ["ERR_MEDIA_CANCELLED", 408]]) {
-        const h = await harness(t, { mocks: { ...catalog, "@/lib/upload": { saveInputLocally: async () => { throw new Error(code); } } } });
-        const form = new FormData(); form.set("model_id", "synthetic"); form.set("prompt", "synthetic");
-        form.set("slot_reference", new File(["x"], "synthetic.png", { type: "image/png" }));
-        const response = await h.loader.load("src/app/api/generate-image/route.ts").POST(new Request("http://localhost/api/generate-image", { method: "POST", body: form }));
-        assert.equal(response.status, status); assert.equal(h.state.submitCalls, 0);
-        const body = await response.json(); assert.equal(body.accepted, false); assert.equal(body.recovery_required, false);
-        assert.ok(!JSON.stringify(body).includes("private raw failure"));
-    }
+    // Media decoding and bounded size classification are covered by the dedicated upload suite.
+
 });
 
 test("every upload path checks declared size before arrayBuffer and forwards the entry signal", async (t) => {
@@ -422,10 +413,10 @@ test("every upload path checks declared size before arrayBuffer and forwards the
         let reads = 0; file.arrayBuffer = async () => { reads++; return new ArrayBuffer(1); }; form.set(key, file);
         const capabilities = { ...caps, elements: true, media_slots: [{ id: "reference", kind: "image" }], ...extraCaps };
         const h = await harness(t, { mocks: {
-            "@/models/capabilities/video": { VIDEO_CAPABILITIES: { synthetic: capabilities } },
-            "@/models/capabilities/image": { IMAGE_CAPABILITIES: { synthetic: capabilities } },
+            "@/server/catalog/video": { VIDEO_CAPABILITIES: { synthetic: capabilities } },
+            "@/server/catalog/image": { IMAGE_CAPABILITIES: { synthetic: capabilities } },
             // T5's 4MiB body guard is tested separately; exercise the decoded-file boundary directly.
-            "@/lib/request-limits": { readGenerationForm: async () => form, requestFailure: () => { throw new Error("unexpected entry failure"); } },
+            "@/server/http/request-limits": { readGenerationForm: async () => form, requestFailure: () => { throw new Error("unexpected entry failure"); } },
         } });
         const response = await h.loader.load(`src/app/api/${route}/route.ts`).POST(new Request(`http://localhost/api/${route}`, { method: "POST" }));
         assert.equal(response.status, 413); assert.equal(reads, 0); assert.equal(h.state.submitCalls, 0);
@@ -436,8 +427,8 @@ test("valid slot, element and reference preprocessing forwards one request signa
     const signals = [];
     const imageUpload = async (_buffer, options) => { signals.push(options.signal); return { remoteUrl: "https://synthetic.invalid/image" }; };
     const h = await harness(t, { mocks: {
-        "@/models/capabilities/video": { VIDEO_CAPABILITIES: { synthetic: { ...caps, elements: true, media_slots: [{ id: "reference", kind: "image" }] } } },
-        "@/lib/media-upload": { processImageUpload: imageUpload, resolveUrl: async (_url, options) => { signals.push(options.signal); return { remoteUrl: "https://synthetic.invalid/existing" }; } },
+        "@/server/catalog/video": { VIDEO_CAPABILITIES: { synthetic: { ...caps, elements: true, media_slots: [{ id: "reference", kind: "image" }] } } },
+        "@/server/media/input-upload": { processImageUpload: imageUpload, resolveUrl: async (_url, options) => { signals.push(options.signal); return { remoteUrl: "https://synthetic.invalid/existing" }; } },
     } });
     const form = new FormData(); form.set("model_id", "synthetic"); form.set("prompt", "synthetic");
     form.set("elem_count", "1"); form.set("elem_0_ref_count", "2");
@@ -448,4 +439,18 @@ test("valid slot, element and reference preprocessing forwards one request signa
     assert.ok(signals[0] instanceof AbortSignal); assert.ok(signals.every((signal) => signal === signals[0] && !signal.aborted));
     const task = await h.store.getTask((await response.json()).task_id);
     assert.ok(Date.parse(task.next_poll_at) >= Date.parse(task.created_at) + 10_000);
+});
+
+test("retired Freepik tasks pause without polling or replaying on a different provider", async (t) => {
+    const h = await harness(t);
+    for (const [id, providerId] of [["retired-freepik", "freepik"], ["retired-unspecified", undefined]]) {
+        await h.store.createTask(fixture(id, { provider_id: providerId }));
+        await h.poller.processDueTasks({ taskId: id });
+        const task = await h.store.getTask(id);
+        assert.equal(task.lifecycle_phase, "paused");
+        assert.equal(task.error_message, "ERR_UNKNOWN_PROVIDER");
+        assert.equal(task.next_poll_at, null);
+    }
+    assert.equal(h.state.submitCalls, 0);
+    assert.equal(h.state.pollCalls, 0);
 });

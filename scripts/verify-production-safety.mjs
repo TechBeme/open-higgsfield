@@ -21,7 +21,7 @@ const baseEnv = { NODE_ENV: "production", APP_ORIGIN: origin, APP_ACCESS_USER: "
     DEPLOYMENT_PROFILE: "single-process", TASK_WORKER_MODE: "local", ASSET_STORAGE_MODE: "local",
     OPEN_HIGGSFIELD_STORAGE_DIR: "/tmp/synthetic-workspace-no-real-files" };
 const context = { params: Promise.resolve({ taskId: "synthetic-task", filename: "synthetic.png" }) };
-const caps = { id: "synthetic", provider: "freepik", media_slots: [], prompt_required: true };
+const caps = { id: "synthetic", provider: "google-ai-studio", media_slots: [], prompt_required: true };
 
 function request(path = "/api/tasks", options = {}) {
     const { authenticated = true, method = "GET", headers, ...rest } = options;
@@ -35,23 +35,21 @@ function harness(env = {}, extraMocks = {}, globals = {}) {
     const calls = { store: 0, submit: 0, uploads: 0, config: 0, worker: 0, start: 0 };
     const store = async () => { calls.store++; return undefined; };
     const mocks = {
-        "@/lib/task-store": { initStore: store, getTask: store, getPublicTask: store, listTasks: store, deleteTask: store, resumeTask: store },
-        "@/lib/generated-assets": { assertGeneratedStorageConfigured: () => { calls.config++; return "local"; } },
-        "@/lib/generation-service": { submitGeneration: async () => { calls.submit++; return { httpStatus: 202, task_id: "synthetic-task", accepted: true, recovery_required: false }; } },
-        "@/lib/media-upload": { processImageUpload: async () => { calls.uploads++; }, processFileUpload: async () => { calls.uploads++; }, resolveUrl: async () => { calls.uploads++; } },
-        "@/lib/upload": { saveInputLocally: async () => { calls.uploads++; }, uploadToTmpfiles: async () => { calls.uploads++; } },
-        "@/models/capabilities/video": { VIDEO_CAPABILITIES: { synthetic: caps } },
-        "@/models/capabilities/image": { IMAGE_CAPABILITIES: { synthetic: caps } },
-        "@/models/adapters/video": { getVideoAdapter: () => ({ validate: () => [] }) },
-        "@/models/adapters/image": { getImageAdapter: () => ({ validate: () => [] }) },
-        "@/lib/poller": { processDueTasks: async (options) => { calls.worker++; calls.workerOptions = options; return { claimed: 2, processed: 2 }; }, startLocalWorker: () => { calls.start++; } },
+        "@/server/tasks/store": { initStore: store, getTask: store, getPublicTask: store, listTasks: store, deleteTask: store, resumeTask: store },
+        "@/server/media/generated-assets": { assertGeneratedStorageConfigured: () => { calls.config++; return "local"; } },
+        "@/server/generation/service": { submitGeneration: async () => { calls.submit++; return { httpStatus: 202, task_id: "synthetic-task", accepted: true, recovery_required: false }; } },
+        "@/server/media/input-upload": { processImageUpload: async () => { calls.uploads++; }, processFileUpload: async () => { calls.uploads++; }, resolveUrl: async () => { calls.uploads++; } },
+        "@/server/media/storage": { saveInputLocally: async () => { calls.uploads++; }, uploadToTmpfiles: async () => { calls.uploads++; } },
+        "@/server/catalog/video": { VIDEO_CAPABILITIES: { synthetic: caps } },
+        "@/server/catalog/image": { IMAGE_CAPABILITIES: { synthetic: caps } },
+        "@/server/tasks/poller": { processDueTasks: async (options) => { calls.worker++; calls.workerOptions = options; return { claimed: 2, processed: 2 }; }, startLocalWorker: () => { calls.start++; } },
         ...extraMocks,
     };
     return { calls, ...createModuleLoader({ env: { ...baseEnv, ...env }, mocks, globals }) };
 }
 
 test("Basic access, strict configuration, origin and credential-role boundaries", () => {
-    const access = harness({ CRON_SECRET: cronSecret }).load("@/lib/workspace-access");
+    const access = harness({ CRON_SECRET: cronSecret }).load("@/server/security/workspace-access");
     assert.equal(access.guardWorkspaceRequest(request()), null);
     for (const authorization of ["", "Basic broken", "Basic !!!", `Basic ${Buffer.from("operator:wrong").toString("base64")}`, `Bearer ${cronSecret}`, "x".repeat(5000)]) {
         assert.equal(access.guardWorkspaceRequest(request("/api/tasks", { headers: { authorization } })).status, 401);
@@ -72,9 +70,9 @@ test("Basic access, strict configuration, origin and credential-role boundaries"
     assert.equal(access.guardSchedulerRequest(request("/api/internal/process-tasks", { headers: { authorization: `Bearer ${cronSecret}` } })), null);
     for (const env of [{ APP_ACCESS_PASSWORD: undefined }, { APP_ACCESS_PASSWORD: "short" }, { APP_ACCESS_USER: "bad:user" },
         { APP_ORIGIN: undefined }, { APP_ORIGIN: "http://localhost:3000" }, { APP_ORIGIN: `${origin}/` }, { APP_ORIGIN: `${origin}/path` }]) {
-        assert.equal(harness(env).load("@/lib/workspace-access").guardWorkspaceRequest(request()).status, 503);
+        assert.equal(harness(env).load("@/server/security/workspace-access").guardWorkspaceRequest(request()).status, 503);
     }
-    const development = harness({ NODE_ENV: "development", APP_ORIGIN: undefined, APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined }).load("@/lib/workspace-access");
+    const development = harness({ NODE_ENV: "development", APP_ORIGIN: undefined, APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined }).load("@/server/security/workspace-access");
     assert.equal(development.guardWorkspaceRequest(new Request("http://localhost:3000/api/tasks")), null);
     assert.equal(development.guardWorkspaceRequest(new Request("http://example.test/api/tasks")).status, 403);
 });
@@ -82,7 +80,7 @@ test("Basic access, strict configuration, origin and credential-role boundaries"
 test("actual proxy covers APIs with extensions, image optimization and locale routing without scheduler redirects", () => {
     const loader = harness({ CRON_SECRET: cronSecret });
     const { default: proxy, config } = loader.load("src/proxy.ts");
-    for (const path of ["/", "/en", "/pt-BR", "/api/generate", "/api/uploaded/file.png", "/api/download/task.id", "/_next/image?url=private", "/api/internal/process-tasks"]) {
+    for (const path of ["/", "/en", "/pt-BR", "/es", "/es/settings", "/es/manifest.webmanifest", "/api/generate", "/api/uploaded/file.png", "/api/download/task.id", "/_next/image?url=private", "/api/internal/process-tasks"]) {
         assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}${path}` }), true, path);
         assert.equal(proxy(request(path, { authenticated: false })).status, 401, path);
     }
@@ -102,7 +100,7 @@ test("credential-free development requires loopback configuration and request ev
     const localOrigins = ["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000", "https://localhost:3443"];
     for (const configuredOrigin of [undefined, ...localOrigins, origin]) {
         const h = harness({ NODE_ENV: "development", APP_ORIGIN: configuredOrigin, APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined });
-        const access = h.load("@/lib/workspace-access");
+        const access = h.load("@/server/security/workspace-access");
         for (const requestOrigin of [...localOrigins, origin]) {
             for (const method of ["GET", "POST"]) {
                 const candidate = new Request(`${requestOrigin}/api/tasks`, { method, headers: { origin: configuredOrigin ?? requestOrigin } });
@@ -115,7 +113,7 @@ test("credential-free development requires loopback configuration and request ev
         assert.equal(handlerResponse.status, configuredOrigin === origin ? 503 : 403);
         assert.equal(h.calls.store, 0);
     }
-    const authenticated = harness({ NODE_ENV: "development" }).load("@/lib/workspace-access");
+    const authenticated = harness({ NODE_ENV: "development" }).load("@/server/security/workspace-access");
     assert.equal(authenticated.guardWorkspaceRequest(request()), null);
     assert.equal(authenticated.guardWorkspaceRequest(request("/api/tasks", { method: "POST" })), null);
     assert.equal(authenticated.guardWorkspaceRequest(request("/api/tasks", { authenticated: false })).status, 401);
@@ -155,18 +153,18 @@ test("production generation defaults disabled before upload/store/provider and v
 });
 
 test("deployment profile rejects ephemeral/file and unconfigured external execution", () => {
-    assert.equal(harness().load("@/lib/production-config").assertRuntimeConfiguration().workerMode, "local");
+    assert.equal(harness().load("@/server/config/production").assertRuntimeConfiguration().workerMode, "local");
     for (const env of [{ DEPLOYMENT_PROFILE: undefined }, { DEPLOYMENT_PROFILE: "distributed" }, { VERCEL: "1" },
         { TASK_WORKER_MODE: "external" }, { TASK_WORKER_MODE: "bad" }, { TASK_OBSERVATION_TIMEOUT_MS: "2" },
         { GENERATION_ENABLED: "yes" }, { DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external", CRON_SECRET: cronSecret },
         { DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external", CRON_SECRET: password, TASK_SCHEDULER_CONFIGURED: "true" }]) {
-        assert.throws(() => harness(env).load("@/lib/production-config").assertRuntimeConfiguration(), /ERR_/);
+        assert.throws(() => harness(env).load("@/server/config/production").assertRuntimeConfiguration(), /ERR_/);
     }
     const config = harness({ VERCEL: "1", DEPLOYMENT_PROFILE: "distributed", DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external",
-        TASK_SCHEDULER_CONFIGURED: "true", CRON_SECRET: cronSecret }).load("@/lib/production-config").assertRuntimeConfiguration();
+        TASK_SCHEDULER_CONFIGURED: "true", CRON_SECRET: cronSecret }).load("@/server/config/production").assertRuntimeConfiguration();
     assert.equal(config.workerMode, "external");
-    assert.throws(() => harness({}, { "@/lib/generated-assets": { assertGeneratedStorageConfigured() { throw new Error("ERR_STORAGE_CONFIG"); } } })
-        .load("@/lib/production-config").assertRuntimeConfiguration(), /ERR_STORAGE_CONFIG/);
+    assert.throws(() => harness({}, { "@/server/media/generated-assets": { assertGeneratedStorageConfigured() { throw new Error("ERR_STORAGE_CONFIG"); } } })
+        .load("@/server/config/production").assertRuntimeConfiguration(), /ERR_STORAGE_CONFIG/);
 });
 
 test("actual generation handlers reject bad origins and oversized bodies without upload or submission", async () => {
@@ -197,13 +195,15 @@ test("actual task resume/delete permits empty bodies and rejects content before 
 });
 
 test("bounded multipart and JSON count real bytes, validate parts and cancel oversized streams", async () => {
-    const limits = harness().load("@/lib/request-limits");
+    const limits = harness().load("@/server/http/request-limits");
     const form = new FormData(); form.set("prompt", "synthetic"); form.set("file", new File(["png"], "fixture.png"));
     assert.equal((await limits.readGenerationForm(request("/api/generate", { method: "POST", body: form }))).get("prompt"), "synthetic");
     await assert.rejects(limits.readGenerationForm(request("/api/generate", { method: "POST", body: "x" })), (e) => e.status === 415);
     const tooMany = new FormData(); for (let i = 0; i < 129; i++) tooMany.append(`field_${i}`, "x");
     await assert.rejects(limits.readGenerationForm(request("/api/generate", { method: "POST", body: tooMany })), /ERR_FORM_LIMIT/);
-    const files = new FormData(); for (let i = 0; i < 17; i++) files.append("files", new File(["x"], `${i}.png`));
+    const files = new FormData(); for (let i = 0; i < limits.GENERATION_MAX_FILES; i++) files.append("files", new File(["x"], `${i}.png`));
+    assert.equal((await limits.readGenerationForm(request("/api/generate", { method: "POST", body: files }))).getAll("files").length, limits.GENERATION_MAX_FILES);
+    files.append("files", new File(["x"], "excess.png"));
     await assert.rejects(limits.readGenerationForm(request("/api/generate", { method: "POST", body: files })), /ERR_FORM_LIMIT/);
     const field = new FormData(); field.set("prompt", "x".repeat(65537));
     await assert.rejects(limits.readGenerationForm(request("/api/generate", { method: "POST", body: field })), /ERR_FORM_LIMIT/);
@@ -223,13 +223,47 @@ test("bounded multipart and JSON count real bytes, validate parts and cancel ove
     await assert.rejects(limits.assertEmptyBody(request("/api/tasks/id", { method: "POST", body: "x" })), /ERR_UNEXPECTED_BODY/);
 });
 
+test("Seedance 2.5 accepts 50 multipart references while rejecting per-slot excess before uploads", async () => {
+    const catalog = createModuleLoader();
+    const capability = catalog.load("@/server/catalog/toapis").TOAPIS_VIDEO_CAPABILITIES["toapis__seedance-2-5"];
+    const { buildToapisRequest } = catalog.load("@/server/providers/toapis");
+    let uploads = 0, submissions = 0;
+    const upload = async () => { uploads++; return { remoteUrl: `https://fixtures.example.test/${uploads}`, localUrl: `/api/uploaded/${uploads}` }; };
+    const h = harness({ GENERATION_ENABLED: "true" }, {
+        "@/server/catalog/runtime": { getRuntimeCapability: async (mediaType, id) => mediaType === "video" && id === capability.id ? capability : undefined },
+        "@/server/media/input-upload": { processImageUpload: upload, processFileUpload: upload },
+        "@/server/generation/service": { submitGeneration: async input => {
+            const { body } = buildToapisRequest({ ...input, providerModelId: capability.provider_model_id });
+            assert.equal(body.image_with_roles.length, 30);
+            assert.equal(body.video_with_roles.length, 10);
+            assert.equal(body.audio_with_roles.length, 10);
+            submissions++;
+            return { httpStatus: 202, accepted: true, task_id: "synthetic-50-references" };
+        } },
+    });
+    const form = new FormData();
+    form.set("model_id", capability.id); form.set("prompt", "Synthetic reference test");
+    for (const [kind, count, extension] of [["image", 30, "png"], ["video", 10, "mp4"], ["audio", 10, "mpeg"]]) {
+        for (let i = 0; i < count; i++) form.append(`file_reference_${kind}s`, new File(["synthetic"], `${i}.${extension}`, { type: `${kind}/${extension}` }));
+    }
+    const handler = h.load("src/app/api/generate/route.ts").POST;
+    const accepted = await handler(request("/api/generate", { method: "POST", body: form }));
+    assert.equal(accepted.status, 202, await accepted.text());
+    assert.equal(uploads, 50); assert.equal(submissions, 1);
+    form.append("file_reference_images", new File(["synthetic"], "excess.png", { type: "image/png" }));
+    const rejected = await handler(request("/api/generate", { method: "POST", body: form }));
+    assert.equal(rejected.status, 400);
+    assert.equal((await rejected.json()).error, "ERR_INVALID_REFERENCE_COUNT");
+    assert.equal(uploads, 50); assert.equal(submissions, 1);
+});
+
 test("body abort and timeout unblock a stalled reader and cancel it", async () => {
     for (const timeout of [false, true]) {
         let cancelled = false;
         const controller = new AbortController();
         const stream = new ReadableStream({ cancel() { cancelled = true; } });
         const globals = timeout ? { AbortSignal: class extends AbortSignal { static timeout(ms) { assert.equal(ms, 30000); return AbortSignal.timeout(5); } } } : {};
-        const limits = harness({}, {}, globals).load("@/lib/request-limits");
+        const limits = harness({}, {}, globals).load("@/server/http/request-limits");
         const pending = limits.readBoundedJson(request("/api/gallery", { method: "POST", signal: controller.signal,
             headers: { "content-type": "application/json" }, body: stream, duplex: "half" }));
         const keepAlive = setTimeout(() => controller.abort(), 50);
@@ -255,7 +289,7 @@ test("scheduler authenticates before worker work and fixes budget, input and fai
     assert.deepEqual(await result.json(), { claimed: 2, processed: 2 });
     assert.equal(h.calls.workerOptions.limit, 10);
     assert.equal(h.calls.workerOptions.budgetMs, 50000);
-    const failed = harness(env, { "@/lib/poller": { processDueTasks() { throw new Error("sensitive upstream failure"); } } });
+    const failed = harness(env, { "@/server/tasks/poller": { processDueTasks() { throw new Error("sensitive upstream failure"); } } });
     const response = await failed.load("src/app/api/internal/process-tasks/route.ts").GET(request("/api/internal/process-tasks", { headers: auth }));
     assert.equal(response.status, 503);
     assert.doesNotMatch(await response.text(), /sensitive/);
@@ -274,14 +308,14 @@ test("startup is once per Node instance, skips builds/Edge and external mode nev
     await external.load("src/instrumentation.ts").register();
     assert.equal(external.calls.store, 1); assert.equal(external.calls.start, 0);
     await assert.rejects(harness({ NEXT_RUNTIME: "nodejs", APP_ACCESS_PASSWORD: undefined }).load("src/instrumentation.ts").register(), /ERR_STARTUP_CONFIGURATION_OR_STORAGE/);
-    const storageFailure = harness({ NEXT_RUNTIME: "nodejs" }, { "@/lib/task-store": { initStore() { throw new Error("private database error"); } } });
+    const storageFailure = harness({ NEXT_RUNTIME: "nodejs" }, { "@/server/tasks/store": { initStore() { throw new Error("private database error"); } } });
     await assert.rejects(storageFailure.load("src/instrumentation.ts").register(), /^Error: ERR_STARTUP_CONFIGURATION_OR_STORAGE$/);
     const readiness = await external.load("src/app/api/ready/route.ts").GET(request("/api/ready"));
     assert.equal((await readiness.json()).scheduler_heartbeat, "unverified");
 });
 
 test("submission parser preserves recovery on 202, task IDs on rejection and lost/malformed outcomes", async () => {
-    const { parseSubmissionResponse, unknownSubmission } = harness().load("@/lib/client-submission");
+    const { parseSubmissionResponse, unknownSubmission } = harness().load("@/features/studio/lib/client-submission");
     for (const status of [200, 202]) {
         const result = await parseSubmissionResponse(Response.json({ task_id: "task", accepted: true, recovery_required: false }, { status }));
         assert.equal(result.accepted, true); assert.equal(result.needsReview, false); assert.equal(result.taskId, "task");

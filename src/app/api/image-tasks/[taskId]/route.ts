@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteTask, getPublicTask, resumeTask } from "@/lib/task-store";
-import { guardWorkspaceRequest } from "@/lib/workspace-access";
-import { assertEmptyBody, requestFailure } from "@/lib/request-limits";
+import { deleteTask, getPublicTask, resumeTask } from "@/server/tasks/store";
+import { guardWorkspaceRequest } from "@/server/security/workspace-access";
+import { assertEmptyBody, requestFailure } from "@/server/http/request-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
