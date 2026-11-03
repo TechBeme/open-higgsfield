@@ -6,6 +6,7 @@ import { applyWorkspaceHeaders, guardWorkspaceRequest } from "@/server/security/
 import { providerConfigFailure, readConfigObject } from "@/server/http/provider-config";
 import { RequestLimitError } from "@/server/http/request-limits";
 import { readBoundedResponse } from "@/server/media/transfer";
+import { discoverRunwareModels } from "@/server/providers/runware-client";
 
 export const runtime = "nodejs";
 
@@ -30,8 +31,17 @@ export async function POST(request: Request) {
         const body = await readConfigObject(request);
         if (!isProviderId(body.providerId)) throw new Error("ERR_UNKNOWN_PROVIDER");
         const providerId = body.providerId as ProviderId;
-        if (providerId !== "google-ai-studio" && providerId !== "vercel-ai-gateway") return applyWorkspaceHeaders(NextResponse.json({ providerId, status: "manual", models: [], message: "This provider exposes no safe generic model-list contract. Use the built-in catalog or add a reviewed capability contract." }));
+        if (providerId !== "google-ai-studio" && providerId !== "vercel-ai-gateway" && providerId !== "runware") return applyWorkspaceHeaders(NextResponse.json({ providerId, status: "manual", models: [], message: "This provider exposes no safe generic model-list contract. Use the built-in catalog or add a reviewed capability contract." }));
         signal = AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]);
+        if (providerId === "runware") {
+            const connection = typeof body.connectionId === "string" ? await getProviderConnection(body.connectionId) : await resolveProviderConnection(providerId);
+            if (connection && connection.providerId !== providerId) throw new Error("ERR_PROVIDER_CONNECTION_PROVIDER_MISMATCH");
+            if (!connection?.secret) throw new Error("ERR_PROVIDER_CONNECTION_NOT_CONFIGURED");
+            const { models, truncated } = await discoverRunwareModels(connection, signal);
+            signal.throwIfAborted();
+            const discovered = await saveDiscoveredModels(providerId, models);
+            return applyWorkspaceHeaders(NextResponse.json({ providerId, status: "unverified", models, discovered, truncated }));
+        }
         if (providerId === "google-ai-studio") {
             const connection = typeof body.connectionId === "string" ? await getProviderConnection(body.connectionId)
                 : await resolveProviderConnection(providerId);

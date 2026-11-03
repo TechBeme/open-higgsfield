@@ -6,7 +6,7 @@ import { FileAudio, Image as ImageIcon, Link2, Upload, Video, X } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useModelCopy } from "@/i18n/use-model-copy";
-import { FileThumbnail } from "./FileThumbnail";
+import { ReferencePreview } from "./ReferencePreview";
 
 export interface ReferenceItem { id: string; file?: File; url?: string; }
 
@@ -39,9 +39,8 @@ export function ReferenceUpload({ slotId, label: rawLabel, description, kind, re
         <div className="flex flex-wrap items-center gap-2"><Icon className="size-4 text-muted-foreground" /><h3 id={id} className="min-w-0 flex-1 text-sm font-medium">{label}</h3><span className={`text-[11px] ${required ? "text-amber-200" : "text-muted-foreground"}`}>{t(required ? "required" : "optional")}</span></div>
         {description && <p className="whitespace-pre-line text-xs leading-relaxed text-muted-foreground">{translateDescription(description)}</p>}
         {items.map(item => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-lg bg-black/20 pl-2 text-xs">
-            {item.file && kind === "image" && <FileThumbnail file={item.file} className="size-8 shrink-0 rounded-md object-cover" />}
-            {item.url && <Link2 className="size-4 shrink-0 text-muted-foreground" />}
-            <span className="min-w-0 flex-1 truncate" title={item.file?.name ?? item.url}>{item.file?.name ?? t("urlReference")}</span>
+            <ReferencePreview file={item.file} url={item.url} kind={kind} className="size-12" />
+            <span className="min-w-0 flex-1 truncate" title={item.file?.name ?? item.url}>{item.file?.name ?? item.url ?? t("urlReference")}</span>
             <Button type="button" variant="ghost" size="icon" aria-label={t("removeAttachment", { name: item.file?.name ?? label })} onClick={() => onRemove(item.id)}><X /></Button>
         </div>)}
         {remaining > 0 && <div className="flex gap-2"><Button type="button" variant="outline" className="flex-1 border-dashed" onClick={() => fileRef.current?.click()}><Upload />{t("upload")}</Button>{allowUrl && <Button type="button" variant="outline" aria-expanded={showUrl} onClick={() => { setShowUrl(!showUrl); setError(""); }}><Link2 />{t("url")}</Button>}</div>}

@@ -77,7 +77,20 @@ export function guardWorkspaceRequest(request: Request): Response | null {
     if (!SAFE_METHODS.has(request.method.toUpperCase())) {
         const origin = request.headers.get("origin");
         const site = request.headers.get("sec-fetch-site");
-        if (origin !== (config.origin ?? url.origin) || site === "cross-site" || site === "same-site") {
+        let expectedOrigin = config.origin ?? url.origin;
+        // Next dev can normalize req.url to localhost while the browser uses 127.0.0.1.
+        // Trust only the actual loopback Host in unpinned development, never forwarded headers.
+        if (!config.origin && process.env.NODE_ENV !== "production" && loopback(url)) {
+            const host = request.headers.get("host");
+            if (host) {
+                try {
+                    const local = new URL(`${url.protocol}//${host}`);
+                    if (!loopback(local) || local.host !== host) return accessFailure("ERR_ORIGIN_FORBIDDEN", 403);
+                    expectedOrigin = local.origin;
+                } catch { return accessFailure("ERR_ORIGIN_FORBIDDEN", 403); }
+            }
+        }
+        if (origin !== expectedOrigin || site === "cross-site" || site === "same-site") {
             return accessFailure("ERR_ORIGIN_FORBIDDEN", 403);
         }
     }

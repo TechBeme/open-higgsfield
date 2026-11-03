@@ -39,6 +39,23 @@ function request(file, method, options = {}) {
     return new Request(`http://localhost/api/${file.replace("[id]", "conn_fixture")}`, { method, ...options });
 }
 
+test("Runware health authenticates with a non-generating model search and detects 200 error envelopes", async () => {
+    for (const valid of [true, false]) {
+        const f = fixture({ providerId: "runware", fetcher: async (url, init) => {
+            assert.equal(url, "https://api.runware.ai/v1");
+            assert.equal(init.headers.Authorization, "Bearer synthetic-key");
+            const task = JSON.parse(init.body)[0];
+            assert.equal(task.taskType, "modelSearch"); assert.equal(task.limit, 1);
+            return Response.json(valid ? { data: [{ taskType: "modelSearch", taskUUID: task.taskUUID, results: [], totalResults: 0 }] }
+                : { errors: [{ code: "invalidApiKey", message: "synthetic-sensitive" }] });
+        } });
+        const response = await f.invoke("providers/[id]/test", "POST", request("providers/[id]/test", "POST"));
+        assert.equal(response.status, valid ? 200 : 502);
+        assert.equal(f.calls.fetch, 1); assert.equal(f.calls.writes, 1);
+        assert.ok(!(await response.text()).includes("synthetic-sensitive"));
+    }
+});
+
 test("provider and catalog JSON routes accept bounded objects and reject malformed input before mutation", async () => {
     for (const [file, method, , valid] of jsonRoutes) {
         const good = fixture();

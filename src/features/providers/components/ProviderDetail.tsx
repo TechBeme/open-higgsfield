@@ -25,7 +25,7 @@ export function ProviderDetail({ provider, connections, catalog, reload, setCata
     const [removing, setRemoving] = useState<ProviderConnectionRecord | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
-    const canVerify = ["google-ai-studio", "vercel-ai-gateway"].includes(provider.id);
+    const canVerify = ["google-ai-studio", "vercel-ai-gateway", "runware"].includes(provider.id);
 
     async function act(id: string, action: "test" | "delete" | "enable", enabled?: boolean) {
         setBusy(id); setNotice(null);

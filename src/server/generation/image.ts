@@ -12,6 +12,7 @@ import { assertGenerationEnabled } from "@/server/config/production";
 import { readGenerationForm, requestFailure } from "@/server/http/request-limits";
 import type { CanonicalParams } from "@/models/canonical";
 import type { ImageModelCapability } from "@/models/capabilities/types";
+import { submissionIdentity } from "@/lib/submission-identity";
 
 
 function rejection(error: string) {
@@ -81,7 +82,7 @@ async function prepareGeneration(form: FormData, signal: AbortSignal) {
       capabilities: caps,
       params,
       media,
-      reuseState: { fieldValues, slotLocalUrls },
+      reuseState: { fieldValues, slotLocalUrls, ...submissionIdentity(form) },
     });
     const { httpStatus, ...body } = result;
     return NextResponse.json(body, { status: httpStatus });

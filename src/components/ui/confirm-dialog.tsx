@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "./button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./dialog";
+import { useTranslations } from "next-intl";
 
 export function ConfirmDialog({ open, onClose, onConfirm, title, description, error, returnFocus, confirmLabel, cancelLabel, busy = false }: {
     open: boolean; onClose: () => void; onConfirm: () => void;
@@ -11,8 +12,9 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, description, er
     title: string; description: string; error?: string; confirmLabel: string; cancelLabel: string; busy?: boolean;
 }) {
     const cancel = useRef<HTMLButtonElement>(null);
+    const t = useTranslations("common");
     return <Dialog open={open} onOpenChange={next => { if (!next && !busy) onClose(); }}>
-        <DialogContent role="alertdialog" initialFocus={cancel} finalFocus={returnFocus} closeLabel={cancelLabel} showCloseButton={!busy} className="bg-[#141618] p-6 sm:max-w-md">
+        <DialogContent role="alertdialog" initialFocus={cancel} finalFocus={returnFocus} closeLabel={t("close")} showCloseButton={!busy} className="bg-[#141618] p-6 sm:max-w-md">
             <DialogTitle className="pr-6 text-lg leading-snug">{title}</DialogTitle>
             <DialogDescription className="leading-relaxed">{description}</DialogDescription>
             {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}

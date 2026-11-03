@@ -4,6 +4,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import type { AnyTask, MediaType } from "@/types";
 import { normalizeTask, publicTask, taskPayload, type NewTaskRecord, type TaskCursor, type TaskRecord } from "@/server/tasks/record";
 import { boundedSignal, withSignal } from "@/server/tasks/runtime";
+import type { GalleryPatch } from "./gallery";
 
 let sqlClient: NeonQueryFunction<false, false> | undefined;
 let schemaVerified = false;
@@ -49,6 +50,7 @@ function record(row: Record<string, unknown>): TaskRecord {
 }
 
 const PUBLIC_COLUMNS = `task_id, media_type, status, created_at, revision, lifecycle_phase,
+    payload->'gallery' AS gallery,
     LEFT(payload->>'model_id', 200) AS model_id,
     LEFT(payload->>'prompt', 8000) AS prompt,
     LEFT(payload->>'error_message', 300) AS error_message,
@@ -82,11 +84,42 @@ export async function readPublicPersistedTask(id: string): Promise<AnyTask | und
 
 export async function listPersistedTasks(media: MediaType, limit: number, cursor: TaskCursor | null): Promise<AnyTask[]> {
     await ensureTaskSchema();
+    const rank = `COALESCE((SELECT MIN(value::double precision) FROM jsonb_each_text(payload->'gallery'->'order')), -EXTRACT(EPOCH FROM created_at)::double precision * 1000)`;
     const rows = await query(`SELECT ${PUBLIC_COLUMNS} FROM generation_tasks
         WHERE media_type = $1 AND deleted_at IS NULL
-        AND ($2::timestamptz IS NULL OR (created_at, task_id) < ($2::timestamptz, $3::text))
-        ORDER BY created_at DESC, task_id DESC LIMIT $4`, [media, cursor?.createdAt ?? null, cursor?.taskId ?? null, limit + 1]);
+        AND ($2::double precision IS NULL OR ${rank} > $2 OR (${rank} = $2 AND (created_at, task_id) < ($3::timestamptz, $4::text)))
+        ORDER BY ${rank}, created_at DESC, task_id DESC LIMIT $5`, [media, cursor ? cursor.order ?? -Date.parse(cursor.createdAt) : null, cursor?.createdAt ?? null, cursor?.taskId ?? null, limit + 1]);
     return rows.map(publicRow);
+}
+
+export async function applyPersistedGallery(patches: GalleryPatch[]): Promise<boolean> {
+    await ensureTaskSchema();
+    const rows = await query(`WITH changes AS MATERIALIZED (
+        SELECT * FROM jsonb_to_recordset($1::jsonb) AS x(id text, revision bigint, gallery jsonb, remove boolean)
+    ), locked AS MATERIALIZED (
+        SELECT t.task_id, t.revision, t.deleted_at FROM generation_tasks t JOIN changes c ON c.id = t.task_id
+        ORDER BY t.task_id FOR UPDATE OF t
+    ), valid AS (
+        SELECT COUNT(*) = (SELECT COUNT(*) FROM changes) AS ok FROM locked l JOIN changes c ON c.id = l.task_id
+        WHERE l.deleted_at IS NULL AND l.revision = c.revision
+    ) UPDATE generation_tasks t SET
+        payload = CASE WHEN c.remove THEN jsonb_build_object('task_id', t.task_id, 'media_type', t.media_type, 'model_id', '', 'created_at', t.created_at)
+            ELSE jsonb_set(t.payload, '{gallery}', c.gallery) END, revision = t.revision + 1, updated_at = NOW(),
+        deleted_at = CASE WHEN c.remove THEN NOW() ELSE t.deleted_at END,
+        status = CASE WHEN c.remove THEN 'CANCELLED' ELSE t.status END,
+        lifecycle_phase = CASE WHEN c.remove THEN 'terminal' ELSE t.lifecycle_phase END,
+        next_poll_at = CASE WHEN c.remove THEN NULL ELSE t.next_poll_at END,
+        lease_token = CASE WHEN c.remove THEN NULL ELSE t.lease_token END,
+        lease_expires_at = CASE WHEN c.remove THEN NULL ELSE t.lease_expires_at END
+        FROM changes c WHERE t.task_id = c.id AND (SELECT ok FROM valid) RETURNING t.task_id`, [JSON.stringify(patches)]);
+    return rows.length === patches.length;
+}
+
+/** Bounded metadata projection: bulk gallery edits never read full base64 media payloads. */
+export async function readGalleryTasks(ids: string[]): Promise<TaskRecord[]> {
+    await ensureTaskSchema();
+    const rows = await query(`SELECT ${PUBLIC_COLUMNS} FROM generation_tasks WHERE task_id = ANY($1::text[]) AND deleted_at IS NULL`, [ids]);
+    return rows.map(row => ({ ...publicRow(row), revision: Number(row.revision), deleted_at: null } as TaskRecord));
 }
 
 export async function createPersistedTask(task: NewTaskRecord, signal?: AbortSignal): Promise<TaskRecord> {

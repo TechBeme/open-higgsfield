@@ -38,7 +38,7 @@ export function ProviderModels({ provider, catalog, connections, connected, relo
     const enabled = visible.filter(isEnabled);
     const disabled = visible.filter(entry => !isEnabled(entry));
     const candidates = catalog.discovered.filter(model => model.providerId === provider.id);
-    const supportsDiscovery = ["google-ai-studio", "vercel-ai-gateway"].includes(provider.id);
+    const supportsDiscovery = ["google-ai-studio", "vercel-ai-gateway", "runware"].includes(provider.id);
 
     async function toggle(entries: CatalogModel[], value: boolean) {
         setBusy(true); setNotice(null);

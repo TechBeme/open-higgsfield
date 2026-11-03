@@ -5,7 +5,7 @@ import type { CanonicalMediaInputs } from "@/models/canonical";
 import { inputFile } from "@/server/generation/input";
 import { processFileUpload, processImageUpload, resolveUrl } from "@/server/media/input-upload";
 
-export interface PreparedSlot { id: string; kind: "image" | "video" | "audio"; values: Array<File | string> }
+export interface PreparedSlot { id: string; kind: "image" | "video" | "audio"; values: Array<File | string>; preserveImage?: boolean }
 
 /** Check all counts and byte limits before uploading any file. */
 export function readModelMedia(form: FormData, model: ModelCapabilities, mode: "image" | "video"): PreparedSlot[] {
@@ -20,7 +20,7 @@ export function readModelMedia(form: FormData, model: ModelCapabilities, mode: "
         if (values.length < (slot.min_count ?? (slot.required ? 1 : 0)) || values.length > (slot.max_count ?? (slot.multiple ? 256 : 1))) throw new Error("ERR_INVALID_REFERENCE_COUNT");
         if (slot.max_bytes && files.some(f => f.size > slot.max_bytes!)) throw new Error("ERR_MEDIA_TOO_LARGE");
         for (const file of files) if (file.type && !file.type.startsWith(`${slot.kind}/`)) throw new Error("ERR_UNSUPPORTED_MEDIA_TYPE");
-        return { id: slot.id, kind: slot.kind, values };
+        return { id: slot.id, kind: slot.kind, values, ...(model.provider === "runware" ? { preserveImage: true } : {}) };
     });
 }
 
@@ -35,7 +35,7 @@ export async function uploadModelMedia(slots: PreparedSlot[], signal: AbortSigna
             const mime = slot.kind === "image" ? "image/jpeg" : slot.kind === "video" ? "video/mp4" : "audio/mpeg";
             // Preserve PNG alpha/masks and vendor-supported image formats.
             const result = typeof value === "string" ? await resolveUrl(value, { signal })
-                : slot.kind === "image"
+                : slot.kind === "image" && !slot.preserveImage
                     ? await processImageUpload(await inputFile(value, mime, signal), { signal })
                     : await processFileUpload(await inputFile(value, mime, signal), value.name, value.type || mime, { signal });
             remote.push(result.remoteUrl); local.push(result.localUrl);

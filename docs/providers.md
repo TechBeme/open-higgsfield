@@ -90,7 +90,7 @@ Provider requests inherit the caller's cancellation and have a maximum of 180
 seconds for submission or 20 seconds for status observation. These do not reset
 the route's overall budget. T2's task scheduler owns query retries, jitter and
 Retry-After; HTTP errors do not mean the provider job failed. Most observation
-requests are GET, but Google Vertex and Vercel Gateway use documented read-only
+requests are GET, but Google Vertex, Vercel Gateway and Runware use documented read-only
 status POSTs. Those may be retried without calling generation submission again.
 Google's authenticated file download has a 64 MiB limit and inherits the query
 signal. General asset/input limits are documented with storage configuration.
@@ -146,6 +146,8 @@ If an existing provider already supports the model's API shape:
 5. Run `npm run check`.
 
 Magnific models require a reviewed schema contract in `src/server/catalog/magnific.ts`.
+Runware models require their exact AIR identifier and official JSON Schema in
+`src/server/catalog/runware-contracts-data.ts`; see the [catalog refresh instructions](runware-models.md#discovery-and-updates).
 
 ## Adding a provider
 
@@ -175,3 +177,7 @@ media capabilities or turn them on. Custom models are saved disabled and
 marked unverified. The provider adapter still owns the upstream endpoint,
 authentication and parameter translation, so a custom catalog entry cannot
 turn the application into an arbitrary proxy.
+
+## Runware
+
+Connect one or more Runware keys in Providers or set `RUNWARE_API_KEY`. The integration includes all 191 image and 110 video models with a live callable AIR in the official public index, per-model JSON Schema validation, asynchronous REST generation and durable polling. Key verification and discovery use the official `modelSearch` task. New candidates stay unverified until their contracts are reviewed. See [Runware models and integration](runware-models.md) for supported models, parameter rules, discovery limits and official references.

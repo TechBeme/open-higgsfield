@@ -5,7 +5,7 @@
 
   **La alternativa open source y multiproveedor a Higgsfield para generar imágenes y videos con IA.**
 
-  Genera con modelos de Magnific, Google AI Studio, Google Vertex AI, Vercel AI Gateway y ToAPIs desde un único estudio creativo.
+  Genera con modelos de Magnific, Google AI Studio, Google Vertex AI, Vercel AI Gateway, ToAPIs y Runware desde un único estudio creativo.
 
   <p>
     <a href="https://openhiggs.techbe.me"><strong>Demo en vivo</strong></a>
@@ -41,7 +41,7 @@
 Los modelos de medios generativos están repartidos entre proveedores, paneles y controles incompatibles. Open-Higgsfield los reúne en un único espacio visual:
 
 - **Genera imágenes y videos en el mismo estudio** sin cambiar de producto.
-- **Elige modelos de imagen y vídeo** de Magnific, Google AI Studio, Vertex AI, Vercel AI Gateway y ToAPIs.
+- **Elige modelos de imagen y vídeo** de Magnific, Google AI Studio, Vertex AI, Vercel AI Gateway, ToAPIs y Runware.
 - **Usa los controles correctos para cada modelo**: aspecto, resolución, duración, seed, CFG, seguridad y audio.
 - **Trabaja naturalmente con referencias** mediante image-to-image, image-to-video, fotograma inicial/final, video y audio.
 - **Cambia de proveedor sin reaprender la interfaz** con tareas, progreso, errores y resultados normalizados.
@@ -84,10 +84,13 @@ Conecta un proveedor desde **Proveedores** o configura sus credenciales mediante
 | Google Vertex AI | 4 | 4 | Credenciales de Google Cloud |
 | Vercel AI Gateway | 45 | 39 | `AI_GATEWAY_API_KEY` |
 | ToAPIs | 51 | 51 | `TOAPIS_API_KEY` |
+| Runware | 191 | 110 | `RUNWARE_API_KEY` |
 
-Recuentos verificados en `/api/catalog` el 2 de noviembre de 2026. Las entradas incluyen variantes de uso, no solo modelos distintos del proveedor. Solo los modelos habilitados de proveedores conectados aparecen en el Estudio.
+Recuentos verificados en `/api/catalog` el 3 de noviembre de 2026. Las entradas incluyen variantes de uso, no solo modelos distintos del proveedor. Solo los modelos habilitados de proveedores conectados aparecen en el Estudio.
 
 El catálogo incluye Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image y OmniHuman. La disponibilidad, los precios, las cuotas y el acceso preview dependen de cada proveedor.
+
+Runware incluye los 301 modelos de imagen/vídeo activos con AIR en el índice oficial (191 de imagen y 110 de vídeo), con validación de parámetros y seguimiento asíncrono. Todos están habilitados por defecto; cada instalación elige cuáles mostrar. Consulta la [integración Runware](docs/runware-models.md) para conocer la cobertura y los límites.
 
 Consulta [Proveedores y modelos](docs/providers.md) para credenciales e instrucciones de extensión.
 
@@ -120,7 +123,7 @@ Consulta [Proveedores y modelos](docs/providers.md) para credenciales e instrucc
 - Componentes compartidos siguiendo las convenciones de shadcn, con primitivas de Base UI
 - SWR para datos en el cliente y next-intl para inglés, portugués brasileño y español
 - Catálogo de capacidades y contratos de generación comunes a los proveedores
-- Magnific API, Google Gen AI SDK, Vertex AI, Vercel AI Gateway y ToAPIs
+- Magnific API, Google Gen AI SDK, Vertex AI, Vercel AI Gateway, ToAPIs y Runware
 - Cloudinary para flujos que necesitan URLs públicas de medios
 - Historial en PostgreSQL/Neon o almacenamiento local explícito con un solo proceso
 
@@ -137,11 +140,13 @@ flowchart LR
     R --> V[Vertex AI]
     R --> W[Vercel AI Gateway]
     R --> O[ToAPIs]
+    R --> X[Runware]
     F --> T[Tareas y archivos normalizados]
     G --> T
     V --> T
     W --> T
     O --> T
+    X --> T
     T --> U
 ```
 
@@ -191,7 +196,7 @@ Abre [http://localhost:3000](http://localhost:3000). Usa el selector de la barra
 2. Introduce un nombre y la clave de API, o los datos de la cuenta de servicio de Vertex AI. Puedes añadir varias conexiones y definir sus prioridades.
 3. Elige los modelos de imagen y video que quieres mostrar, vuelve al **Estudio** y escribe un prompt. Sin una conexión y un modelo habilitados, la generación permanece desactivada.
 
-**Descubrir modelos** está disponible para Google AI Studio y Vercel AI Gateway. El descubrimiento guarda candidatos para revisión; no los activa automáticamente. Los modelos personalizados reutilizan un adaptador compatible y necesitan un contrato de capacidades revisado. Consulta [configuración de proveedores](docs/providers.md#runtime-provider-configuration).
+**Descubrir modelos** está disponible para Google AI Studio, Vercel AI Gateway y Runware. El descubrimiento guarda candidatos para revisión; no los activa automáticamente. Los modelos personalizados reutilizan un adaptador compatible y necesitan un contrato de capacidades revisado. Consulta [configuración de proveedores](docs/providers.md#runtime-provider-configuration).
 
 El desarrollo escucha en `127.0.0.1`. Sin credenciales, mantén el servidor local; configura una contraseña y un origen HTTPS antes de exponer otro entorno.
 
@@ -207,6 +212,7 @@ GOOGLE_CLOUD_LOCATION=global
 GOOGLE_SERVICE_ACCOUNT_JSON=
 AI_GATEWAY_API_KEY=
 TOAPIS_API_KEY=
+RUNWARE_API_KEY=
 CLOUDINARY_URL=
 ```
 

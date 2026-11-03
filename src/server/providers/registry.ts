@@ -6,6 +6,7 @@ import type { GenerationProvider, ProviderId } from "@/providers/types";
 import { VercelAiGatewayProvider } from "@/server/providers/vercel-ai-gateway";
 import { ToapisProvider } from "@/server/providers/toapis";
 import { MagnificProvider } from "@/server/providers/magnific-provider";
+import { RunwareProvider } from "@/server/providers/runware";
 
 const providers = new Map<ProviderId, GenerationProvider>([
     ["google-ai-studio", new GoogleProvider("google-ai-studio")],
@@ -13,6 +14,7 @@ const providers = new Map<ProviderId, GenerationProvider>([
     ["vercel-ai-gateway", new VercelAiGatewayProvider()],
     ["toapis", new ToapisProvider()],
     ["magnific", new MagnificProvider()],
+    ["runware", new RunwareProvider()],
 ]);
 
 export function resolveProvider(caps: ModelCapabilities): {

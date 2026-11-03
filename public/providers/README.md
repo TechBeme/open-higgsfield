@@ -5,7 +5,7 @@ official websites and asset libraries, without redrawing or recoloring the marks
 All logos and trademarks belong to their respective owners; the project's MIT
 license does not grant rights to those trademarks.
 
-Sources verified on 2026-11-02:
+Sources verified on 2026-11-02 unless otherwise noted:
 
 | File | Official source |
 | --- | --- |
@@ -14,6 +14,7 @@ Sources verified on 2026-11-02:
 | `vercel-ai-gateway.svg` | [Vercel](https://vercel.com/ai-gateway): [official white Vercel symbol](https://assets.vercel.com/image/upload/front/assets/design/vercel-triangle-white.svg) |
 | `toapis.svg` | [ToAPIs](https://toapis.com/): [site logo](https://toapis.com/logo.svg?v=1.5.2) |
 | `magnific.png` | [Magnific documentation](https://docs.magnific.com/introduction): [192 px dark-theme icon](https://docs.magnific.com/mintlify-assets/_mintlify/favicons/magnific/Wip97Ky32re5bOqN/_generated/favicon-dark/android-chrome-192x192.png) |
+| `runware.svg` | [Runware documentation](https://runware.ai/docs/): [official favicon](https://runware.ai/docs/favicon.svg), retrieved 2026-11-03 |
 
 The application serves these files locally. `ProviderMark` preserves their aspect
 ratios and uses the same assets in provider cards, provider details and model pickers.

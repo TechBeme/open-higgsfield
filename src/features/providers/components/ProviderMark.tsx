@@ -8,6 +8,7 @@ const providerLogos = {
     "vercel-ai-gateway": "/providers/vercel-ai-gateway.svg",
     toapis: "/providers/toapis.svg",
     magnific: "/providers/magnific.png",
+    runware: "/providers/runware.svg",
 } satisfies Record<ProviderId, string>;
 
 export function ProviderMark({ id, large = false }: { id: string; large?: boolean }) {

@@ -281,7 +281,7 @@ export async function saveDiscoveredModels(providerId: ProviderId, models: Array
     return mutate((config) => {
         const now = new Date().toISOString();
         for (const model of models.slice(0, 500)) {
-            if (!/^[A-Za-z0-9_.:/-]{1,200}$/.test(model.providerModelId)) continue;
+            if (!(providerId === "runware" ? /^[A-Za-z0-9_.:@/-]{1,200}$/ : /^[A-Za-z0-9_.:/-]{1,200}$/).test(model.providerModelId)) continue;
             const existing = config.discoveredModels.find((entry) => entry.providerId === providerId && entry.providerModelId === model.providerModelId);
             if (existing) { existing.displayName = model.displayName ?? existing.displayName; existing.mediaType = model.mediaType ?? existing.mediaType; existing.discoveredAt = now; }
             else config.discoveredModels.push({ id: `discovered_${randomUUID()}`, providerId, providerModelId: model.providerModelId, displayName: model.displayName, mediaType: model.mediaType ?? "unknown", status: "unverified", discoveredAt: now });
@@ -327,7 +327,8 @@ export function connectionFromEnv(providerId: ProviderId): ProviderConnectionCon
         : providerId === "google-vertex" ? process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? process.env.GOOGLE_CLOUD_CREDENTIALS
             : providerId === "vercel-ai-gateway" ? process.env.AI_GATEWAY_API_KEY
                 : providerId === "toapis" ? process.env.TOAPIS_API_KEY
-                    : providerId === "magnific" ? process.env.MAGNIFIC_API_KEY : undefined;
+                    : providerId === "magnific" ? process.env.MAGNIFIC_API_KEY
+                        : providerId === "runware" ? process.env.RUNWARE_API_KEY : undefined;
     if (!key?.trim()) return undefined;
     const metadata: Record<string, unknown> = {};
     if (providerId === "google-vertex") { metadata.project = process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCLOUD_PROJECT; metadata.location = process.env.GOOGLE_CLOUD_LOCATION; metadata.veoLocation = process.env.GOOGLE_VEO_LOCATION; }
