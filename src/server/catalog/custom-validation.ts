@@ -8,6 +8,7 @@ import { IMAGE_CAPABILITIES } from "./image";
 import { VIDEO_CAPABILITIES } from "./video";
 import { getMagnificContract } from "./magnific";
 import { getToapisContract } from "./toapis";
+import { getRunwareContract } from "./runware";
 
 const unsafeKeys = new Set(["__proto__", "prototype", "constructor"]);
 const identifier = z.string().regex(/^[A-Za-z0-9_.:-]{1,180}$/).refine(value => value.split(/[.:]/).every(part => !unsafeKeys.has(part)));
@@ -60,7 +61,7 @@ const mediaSlot = z.strictObject({
 const capabilitySchema = z.strictObject({
     id: identifier, label, family: label, variant: z.string().max(300), group: label,
     category: z.string().max(300).optional(), deprecated: z.boolean().optional(),
-    provider: z.string().refine(isProviderId), provider_model_id: z.string().regex(/^[A-Za-z0-9_.:/-]{1,200}$/),
+    provider: z.string().refine(isProviderId), provider_model_id: z.string().regex(/^[A-Za-z0-9_.:@/-]{1,200}$/),
     provider_mode: z.enum(["native-image", "language-image", "image-model", "video", "interaction"]).optional(),
     provider_action: identifier.optional(),
     prompt_required: z.boolean(), prompt_supported: z.boolean().optional(), prompt_max: nonnegative.optional(),
@@ -103,7 +104,9 @@ export function assertCustomModelCapabilities(value: unknown, mediaType: "image"
     if (model.id !== (modelId ?? model.id) || Object.hasOwn(IMAGE_CAPABILITIES, model.id) || Object.hasOwn(VIDEO_CAPABILITIES, model.id)) throw new Error("ERR_CUSTOM_MODEL_INVALID");
     if (mediaType === "video" && model.provider_mode !== "video" || mediaType === "image" && model.provider_mode === "video") throw new Error("ERR_CUSTOM_MODEL_MEDIA_TYPE");
     if (model.provider === "magnific" && !getMagnificContract(model.provider_model_id, mediaType)
-        || model.provider === "toapis" && !getToapisContract(model.provider_model_id, mediaType, model.provider_action)) throw new Error("ERR_CUSTOM_MODEL_ADAPTER_REQUIRED");
+        || model.provider === "toapis" && !getToapisContract(model.provider_model_id, mediaType, model.provider_action)
+        || model.provider === "runware" && !getRunwareContract(model.provider_model_id, mediaType)) throw new Error("ERR_CUSTOM_MODEL_ADAPTER_REQUIRED");
+    if (model.provider !== "runware" && model.provider_model_id.includes("@")) throw new Error("ERR_CUSTOM_MODEL_INVALID");
     for (const fields of [model.custom_fields, model.media_slots]) {
         if (new Set(fields.map(field => field.id)).size !== fields.length) throw new Error("ERR_CUSTOM_MODEL_INVALID");
     }

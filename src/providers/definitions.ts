@@ -70,7 +70,17 @@ export const PROVIDER_DEFINITIONS: readonly ProviderDefinition[] = [
         discovery: "built-in",
         envKeys: ["MAGNIFIC_API_KEY"],
     },
-
+    {
+        id: "runware",
+        docsUrl: "https://runware.ai/docs/models-api/introduction",
+        label: "Runware",
+        description: "Image and video models through the Runware API.",
+        secretKind: "api-key",
+        mediaTypes: ["image", "video"],
+        supportsMultipleConnections: true,
+        discovery: "provider-api",
+        envKeys: ["RUNWARE_API_KEY"],
+    },
 ];
 
 export function getProviderDefinition(id: ProviderId): ProviderDefinition {

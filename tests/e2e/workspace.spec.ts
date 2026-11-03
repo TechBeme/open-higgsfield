@@ -24,14 +24,14 @@ for (const [locale, m] of Object.entries(messages)) {
 
         await page.getByRole("link", { name: m.workspace.providers, exact: true }).click();
         await expect(page.getByRole("heading", { name: m.providers.title })).toBeVisible();
-        await expect(page.locator(".provider-card")).toHaveCount(5);
+        await expect(page.locator(".provider-card")).toHaveCount(6);
         for (const mark of await page.locator('.provider-card img').all()) {
             await mark.scrollIntoViewIfNeeded();
             await mark.evaluate(image => (image as HTMLImageElement).decode());
             await expect(mark).toHaveCSS("object-fit", "contain");
         }
         await page.reload();
-        await expect(page.locator(".provider-card")).toHaveCount(5);
+        await expect(page.locator(".provider-card")).toHaveCount(6);
         await expectWithinViewport(page);
         expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
         await page.screenshot({ path: testInfo.outputPath("providers.png"), fullPage: true });
@@ -103,6 +103,7 @@ test("language switching preserves the provider, query, cookie and reload", asyn
         await page.getByRole("button", { name: messages[current].workspace.language, exact: true }).click();
         await page.getByRole("menuitem", { name: messages[current].languages[next], exact: true }).click();
         await expect(page).toHaveURL(new RegExp(`/${next}/settings\\?provider=google-vertex&qa=preserved$`));
+        await expect(page.getByRole("button", { name: messages[next].workspace.language, exact: true })).toBeVisible();
         await page.reload();
         await expect(page.locator("html")).toHaveAttribute("lang", next);
         await expect(page.getByRole("heading", { name: "Google Vertex AI", exact: true })).toBeVisible();
@@ -111,7 +112,7 @@ test("language switching preserves the provider, query, cookie and reload", asyn
     }
 });
 
-test("an uncertain generation response blocks duplicate submission", async ({ page }) => {
+test("an uncertain generation response warns about that request without blocking new work", async ({ page }) => {
     await mockWorkspace(page);
     let submissions = 0;
     await page.route("**/api/generate-image", route => {
@@ -122,9 +123,9 @@ test("an uncertain generation response blocks duplicate submission", async ({ pa
     await page.getByRole("textbox", { name: en.commandBar.promptLabel }).fill("Synthetic image test");
     await page.getByRole("button", { name: new RegExp(`^${en.common.generate}`) }).click();
     await expect(page.getByText(en.errors.ERR_SUBMISSION_OUTCOME_UNKNOWN)).toBeVisible();
-    await expect(page.getByRole("button", { name: new RegExp(en.commandBar.reviewRequired) })).toBeDisabled();
+    await expect(page.getByRole("button", { name: new RegExp(`^${en.common.generate}`) })).toBeEnabled();
     await page.getByRole("textbox", { name: en.commandBar.promptLabel }).press("Enter");
-    expect(submissions).toBe(1);
+    await expect.poll(() => submissions).toBe(2);
 });
 
 test("history pagination failure preserves results and retry deduplicates pages", async ({ page }) => {

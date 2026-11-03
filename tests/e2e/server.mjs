@@ -153,7 +153,7 @@ try {
         GEMINI_API_KEY: "", GOOGLE_AI_API_KEY: "", GOOGLE_API_KEY: "", GOOGLE_APPLICATION_CREDENTIALS: "",
         GOOGLE_SERVICE_ACCOUNT_JSON: "", GOOGLE_CLOUD_CREDENTIALS: "", GOOGLE_CLOUD_PROJECT: "", GCLOUD_PROJECT: "",
         GOOGLE_CLOUD_LOCATION: "", GOOGLE_VEO_LOCATION: "", AI_GATEWAY_API_KEY: "", TOAPIS_API_KEY: "",
-        TOAPIS_BASE_URL: "", MAGNIFIC_API_KEY: "", FREEPIK_API_KEY: "", NEXT_PHASE: "",
+        TOAPIS_BASE_URL: "", MAGNIFIC_API_KEY: "", FREEPIK_API_KEY: "", RUNWARE_API_KEY: "", NEXT_PHASE: "",
     };
     child = spawn(process.execPath, argumentsForNext, {
         cwd: root, env: environment, stdio: ["ignore", "inherit", "inherit"], detached: process.platform !== "win32",

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle, Paperclip, X } from "lucide-react";
+import { AlertCircle, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +20,8 @@ import type { AttachmentItem } from "@/features/studio/types";
 import type { SizeUiResolution } from "@/types";
 import { buildGroupedDropTargets, filesForDropTarget, slotsToDropDescriptors, type GroupedDropTarget } from "@/features/studio/lib/attachment-drop-targets";
 import { remapSlotFilesOnModelSwitch, remapVideoAttachmentsOnModelSwitch } from "@/features/studio/lib/attachment-remap";
-import { parseSubmissionResponse, unknownSubmission } from "@/features/studio/lib/client-submission";
+import { submitInBackground } from "@/features/studio/lib/background-submissions";
+import { hasMediaTransfer, isUrlReference, readMediaTransfer } from "@/features/studio/lib/media-transfer";
 
 import { VideoModelPill } from "@/features/studio/components/command-bar/VideoModelPill";
 import { ImageModelPill } from "@/features/studio/components/command-bar/ImageModelPill";
@@ -32,7 +33,7 @@ import { ControlsPill } from "@/features/studio/components/command-bar/ControlsP
 import { VideoControlsPill } from "@/features/studio/components/command-bar/VideoControlsPill";
 import { AttachmentButton } from "@/features/studio/components/command-bar/AttachmentButton";
 import { ImageAttachmentButton } from "@/features/studio/components/command-bar/ImageAttachmentButton";
-import { FileThumbnail } from "@/features/studio/components/FileThumbnail";
+import { ReferencePreview } from "@/features/studio/components/ReferencePreview";
 import { useModelCopy } from "@/i18n/use-model-copy";
 
 const schema = z.object({ prompt: z.string().max(65536) });
@@ -88,10 +89,6 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
 
     // ── Shared state ──
     const [apiError, setApiError] = useState<string | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submissionNeedsReview, setSubmissionNeedsReview] = useState(false);
-    const submittingRef = useRef(false);
-    const reviewRequiredRef = useRef(false);
     const [isDragOverlayVisible, setIsDragOverlayVisible] = useState(false);
     const [activeDropTargetId, setActiveDropTargetId] = useState<string | null>(null);
 
@@ -158,7 +155,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
     const hasDropTargets = dropTargets.length > 0;
 
     useEffect(() => {
-        const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+        const hasFiles = (event: DragEvent) => hasMediaTransfer(event.dataTransfer);
 
         const handleDragEnter = (event: DragEvent) => {
             if (!hasFiles(event) || !hasDropTargets) return;
@@ -190,26 +187,35 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
             setIsDragOverlayVisible(false);
             setActiveDropTargetId(null);
         };
+        const clearDrag = () => {
+            dragDepthRef.current = 0;
+            setIsDragOverlayVisible(false);
+            setActiveDropTargetId(null);
+        };
 
         window.addEventListener("dragenter", handleDragEnter);
         window.addEventListener("dragover", handleDragOver);
         window.addEventListener("dragleave", handleDragLeave);
         window.addEventListener("drop", handleDrop);
+        window.addEventListener("dragend", clearDrag);
+        window.addEventListener("blur", clearDrag);
 
         return () => {
             window.removeEventListener("dragenter", handleDragEnter);
             window.removeEventListener("dragover", handleDragOver);
             window.removeEventListener("dragleave", handleDragLeave);
             window.removeEventListener("drop", handleDrop);
+            window.removeEventListener("dragend", clearDrag);
+            window.removeEventListener("blur", clearDrag);
         };
     }, [hasDropTargets, isDragOverlayVisible]);
 
     function fileToAttachment(roleId: string, file: File, kind: "image" | "video" | "audio"): AttachmentItem {
         return {
-            id: `${roleId}-${file.name}-${file.size}-${file.lastModified}`,
+            id: crypto.randomUUID(),
             roleId,
-            type: "file",
-            file,
+            type: isUrlReference(file) ? "url" : "file",
+            ...(isUrlReference(file) ? { url: file.name } : { file }),
             kind,
         };
     }
@@ -224,8 +230,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
             if (target.roleIds.length > 1) {
                 // Find empty slots first, then fill occupied ones
                 const emptySlotIds = target.roleIds.filter((id) => !next[id]?.length);
-                const occupiedSlotIds = target.roleIds.filter((id) => next[id]?.length);
-                const orderedSlotIds = [...emptySlotIds, ...occupiedSlotIds];
+                const orderedSlotIds = emptySlotIds;
 
                 acceptedFiles.forEach((file, index) => {
                     const slotId = orderedSlotIds[index];
@@ -254,41 +259,61 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
             const withoutTargetRoles = prev.filter((item) => !target.roleIds.includes(item.roleId));
 
             if (target.roleIds.length > 1) {
-                const distributed = target.roleIds
+                const emptyRoles = target.roleIds.filter(roleId => !prev.some(item => item.roleId === roleId));
+                const distributed = emptyRoles
                     .map((roleId, index) => {
                         const file = acceptedFiles[index];
                         if (!file) return null;
                         return fileToAttachment(roleId, file, target.kind);
                     })
                     .filter((item): item is AttachmentItem => Boolean(item));
-                return [...withoutTargetRoles, ...distributed];
+                return [...prev, ...distributed];
             }
 
             const roleId = target.roleIds[0];
             const dropped = target.acceptMany
-                ? acceptedFiles.slice(0, videoModel?.media_slots.find(slot => slot.id === roleId)?.max_count ?? 256).map((file) => fileToAttachment(roleId, file, target.kind))
+                ? [...prev.filter(item => item.roleId === roleId), ...acceptedFiles.map(file => fileToAttachment(roleId, file, target.kind))].slice(0, videoModel?.media_slots.find(slot => slot.id === roleId)?.max_count ?? 256)
                 : [fileToAttachment(roleId, acceptedFiles[0], target.kind)];
 
             return [...withoutTargetRoles, ...dropped];
         });
     }
 
-    function handleDropToTarget(target: GroupedDropTarget, event: React.DragEvent<HTMLElement>) {
+    function attachTransferredFiles(files: File[], preferred?: GroupedDropTarget) {
+        if (!files.length) { setApiError("ERR_UNSUPPORTED_MEDIA_TYPE"); return; }
+        let rejected = false;
+        const batches = preferred ? [preferred] : dropTargets.filter(target => files.some(file => file.type.startsWith(`${target.kind}/`)))
+            .filter((target, index, targets) => targets.findIndex(other => other.kind === target.kind) === index);
+        if (!batches.length) { setApiError("ERR_UNSUPPORTED_MEDIA_TYPE"); return; }
+        for (const candidate of batches) {
+            const sameKind = filesForDropTarget(candidate, files);
+            const compatible = preferred ? [candidate] : dropTargets.filter(target => target.kind === candidate.kind);
+            const count = (id: string) => mode === "image" ? slotFiles[id]?.length ?? 0 : attachments.filter(item => item.roleId === id).length;
+            const capacity = (id: string) => {
+                const slot = mode === "image" ? imageUploadSlots.find(item => item.id === id) : videoModel?.media_slots.find(item => item.id === id);
+                return slot?.max_count ?? (slot?.multiple ? 256 : 1);
+            };
+            // Generic prompt drops prefer ordinary references, keeping masks and end frames explicit.
+            const ordered = [...compatible].sort((a, b) => Number(/mask|last|end/i.test(a.id)) - Number(/mask|last|end/i.test(b.id)));
+            const target = ordered.find(item => item.roleIds.some(id => count(id) < capacity(id)));
+            if (!target) { rejected = true; continue; }
+            const remaining = target.roleIds.reduce((sum, id) => sum + Math.max(0, capacity(id) - count(id)), 0);
+            if (sameKind.length > remaining) rejected = true;
+            const accepted = sameKind.slice(0, remaining);
+            if (mode === "image") applyImageDrop(target, accepted); else applyVideoDrop(target, accepted);
+        }
+        if (files.some(file => !batches.some(target => file.type.startsWith(`${target.kind}/`)))) {
+            setApiError("ERR_UNSUPPORTED_MEDIA_TYPE");
+        } else setApiError(rejected ? "ERR_ATTACHMENT_LIMIT" : null);
+    }
+
+    function handleDropToTarget(target: GroupedDropTarget | undefined, event: React.DragEvent<HTMLElement>) {
         event.preventDefault();
         event.stopPropagation();
         setActiveDropTargetId(null);
         setIsDragOverlayVisible(false);
         dragDepthRef.current = 0;
-
-        const files = Array.from(event.dataTransfer.files ?? []);
-        if (files.length === 0) return;
-
-        if (mode === "image") {
-            applyImageDrop(target, files);
-            return;
-        }
-
-        applyVideoDrop(target, files);
+        attachTransferredFiles(readMediaTransfer(event.dataTransfer, window.location.origin), target);
     }
 
     // ── Handlers ──
@@ -383,57 +408,38 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
     useEffect(() => { onPromptSupportChange(supportsPrompt); }, [supportsPrompt, onPromptSupportChange]);
     useEffect(() => { if (supportsPrompt) requestAnimationFrame(autoResize); }, [supportsPrompt, autoResize]);
 
-    const onSubmit = async (data: FormData) => {
+    const onSubmit = (data: FormData) => {
         if (!activeModel || activeCatalog.isLoading || activeCatalog.error) return;
         if (supportsPrompt && activeModel.prompt_required && !data.prompt.trim()) { setApiError("ERR_PROMPT_REQUIRED"); textareaRef.current?.focus(); return; }
         const requiredSlots = mode === "image" ? imageUploadSlots : videoRoleDescriptors;
         if (requiredSlots.some(slot => slot.required && !(mode === "image" ? slotFiles[slot.id]?.length : attachments.some(item => item.roleId === slot.id)))) { setApiError("ERR_MISSING_ATTACHMENT"); return; }
         if (supportsPrompt && data.prompt.length > (activeModel.prompt_max ?? 65536)) { setApiError("ERR_PROMPT_TOO_LONG"); return; }
-        // State updates are asynchronous; this also fences click and Enter in the same frame.
-        if (submittingRef.current || reviewRequiredRef.current) return;
-        submittingRef.current = true;
-        setIsSubmitting(true);
         setApiError(null);
         const submittedMode = mode;
-        let outcome = unknownSubmission();
-        try {
-            const body = new FormData();
-            body.append("prompt", supportsPrompt ? data.prompt : "");
-            if (submittedMode === "video") {
-                body.append("model_id", videoModelId);
-                body.append("variant_id", videoVariantId);
-                body.append("settings", JSON.stringify(videoSettings));
-                for (const att of attachments) {
-                    if (att.file) body.append(`file_${att.roleId}`, att.file);
-                    else if (att.url) body.append(`url_${att.roleId}`, att.url);
-                }
-            } else {
-                body.append("model_id", imageModelId);
-                body.append("size_aspect", sizeAspect);
-                body.append("size_resolution", sizeResolution);
-                body.append("field_values", JSON.stringify(imageFieldValues));
-                for (const [slotId, files] of Object.entries(slotFiles)) {
-                    files.forEach((file) => {
-                        if (file.size === 0 && /^(https:\/\/|\/api\/)/.test(file.name)) body.append(`url_${slotId}`, file.name);
-                        else body.append(`slot_${slotId}`, file);
-                    });
-                }
+        const body = new FormData();
+        body.append("prompt", supportsPrompt ? data.prompt : "");
+        if (submittedMode === "video") {
+            body.append("model_id", videoModelId);
+            body.append("variant_id", videoVariantId);
+            body.append("settings", JSON.stringify(videoSettings));
+            for (const att of attachments) {
+                if (att.file) body.append(`file_${att.roleId}`, att.file);
+                else if (att.url) body.append(`url_${att.roleId}`, att.url);
             }
-            const response = await fetch(submittedMode === "video" ? "/api/generate" : "/api/generate-image", { method: "POST", body });
-            outcome = await parseSubmissionResponse(response);
-        } catch {
-            outcome = unknownSubmission();
-        } finally {
-            reviewRequiredRef.current = outcome.needsReview;
-            setSubmissionNeedsReview(outcome.needsReview);
-            setApiError(outcome.error ?? null);
-            if (outcome.taskId || outcome.needsReview) {
-                if (submittedMode === "video") revalidateVideoTasks();
-                else revalidateImageTasks();
+        } else {
+            body.append("model_id", imageModelId);
+            body.append("size_aspect", sizeAspect);
+            body.append("size_resolution", sizeResolution);
+            body.append("field_values", JSON.stringify(imageFieldValues));
+            for (const [slotId, files] of Object.entries(slotFiles)) {
+                files.forEach((file) => {
+                    if (file.size === 0 && /^(https:\/\/|\/api\/)/.test(file.name)) body.append(`url_${slotId}`, file.name);
+                    else body.append(`slot_${slotId}`, file);
+                });
             }
-            submittingRef.current = false;
-            setIsSubmitting(false);
         }
+        submitInBackground({ mode: submittedMode, model: activeModel.label, prompt: supportsPrompt ? data.prompt : "" }, body,
+            submittedMode === "video" ? revalidateVideoTasks : revalidateImageTasks);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -458,20 +464,22 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
                         <div role="alert" className="flex items-center gap-2 text-[#ffc4c4]" style={{ borderColor: "rgba(255,128,128,.22)" }}>
                             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                             <span className="flex-1">{tErrors.has(apiError as never) ? tErrors(apiError as never) : tErrors("ERR_GENERIC")}</span>
-                            {!submissionNeedsReview && <button type="button" aria-label={tCommand("dismissError")} onClick={() => setApiError(null)} className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-white/10"><X className="size-4" /></button>}
+                            <button type="button" aria-label={tCommand("dismissError")} onClick={() => setApiError(null)} className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-white/10"><X className="size-4" /></button>
                         </div>
-                        {submissionNeedsReview && (
-                            <button type="button" className="mt-3 rounded-lg border border-white/20 px-3 py-2 text-white hover:bg-white/10"
-                                onClick={() => { reviewRequiredRef.current = false; setSubmissionNeedsReview(false); setApiError(null); }}>
-                                {tCommand("reviewedSubmission")}
-                            </button>
-                        )}
+
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Composer */}
             <form
+                data-studio-composer
+                onDragOver={event => { if (hasMediaTransfer(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }}
+                onDrop={event => { if (hasMediaTransfer(event.dataTransfer)) handleDropToTarget(undefined, event); }}
+                onPaste={event => {
+                    const files = Array.from(event.clipboardData.files);
+                    if (files.length) { event.preventDefault(); attachTransferredFiles(files); }
+                }}
                 onSubmit={(event) => { void handleSubmit(onSubmit, () => setApiError("ERR_PROMPT_TOO_LONG"))(event); }}
                 className="mx-auto grid w-full max-w-[70rem] grid-cols-1 items-stretch gap-2 sm:grid-cols-[64px_minmax(0,1fr)] sm:gap-3"
             >
@@ -551,9 +559,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
                                     {Object.entries(slotFiles).flatMap(([slotId, files]) =>
                                         files.map((file, idx) => (
                                             <div key={`${slotId}-${idx}`} className="relative w-[50px] h-[50px] shrink-0">
-                                                {file.size > 0 && imageUploadSlots.find(slot => slot.id === slotId)?.kind === "image" ? <FileThumbnail file={file} className="block object-cover rounded-[9px] w-[50px] h-[50px] border border-white/[.12]" />
-                                                    : file.size > 0 ? <div className="grid size-[50px] place-items-center rounded-lg border border-white/15 bg-white/5"><Paperclip className="size-5 text-muted-foreground" /></div>
-                                                    : <div className="grid h-[50px] w-[50px] place-items-center rounded-[9px] border border-white/[.12] text-xs text-muted-foreground">URL</div>}
+                                                <ReferencePreview file={isUrlReference(file) ? undefined : file} url={isUrlReference(file) ? file.name : undefined} kind={imageUploadSlots.find(slot => slot.id === slotId)?.kind} />
                                                 <button
                                                     type="button"
                                                     aria-label={tCommand("removeAttachment", { name: file.size ? file.name : tCommand("urlReference") })}
@@ -577,7 +583,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
                                 <div className="flex max-w-full items-center gap-[5px] flex-wrap shrink-0">
                                     {attachments.map((att) => (
                                         <div key={att.id} className="relative w-[50px] h-[50px] shrink-0">
-                                            {att.file && att.kind === "image" ? <FileThumbnail file={att.file} className="size-[50px] rounded-lg object-cover" /> : <div className="grid size-[50px] place-items-center rounded-lg border border-white/15 bg-white/5"><Paperclip className="size-5 text-muted-foreground" /></div>}
+                                            <ReferencePreview file={att.file} url={att.url} kind={att.kind} />
                                             <button
                                                 type="button"
                                                 aria-label={tCommand("removeAttachment", { name: att.file?.name ?? att.roleId })}
@@ -603,11 +609,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
                                             e.stopPropagation();
                                         }}
                                         onDrop={(e) => {
-                                            if (dropTargets.length === 1) {
-                                                handleDropToTarget(dropTargets[0], e);
-                                                return;
-                                            }
-                                            e.preventDefault();
+                                            handleDropToTarget(dropTargets.length === 1 ? dropTargets[0] : undefined, e);
                                         }}
                                     >
                                         {dropTargets.length === 1 ? (
@@ -789,8 +791,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
                     {/* Generate button — flex end, large lime */}
                     <button
                         type="submit"
-                        disabled={modelUnavailable || isSubmitting || submissionNeedsReview}
-                        aria-busy={isSubmitting}
+                        disabled={modelUnavailable}
                         className="w-full min-h-12 shrink-0 self-center border-none rounded-[22px] font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed sm:w-[146px] sm:min-h-[88px]"
                         style={{
                             background: "linear-gradient(180deg, #d5ff47, #bcf122)",
@@ -801,7 +802,7 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
                             boxShadow: "0 20px 42px rgba(188,241,34,.18)",
                         }}
                     >
-                        <span>{isSubmitting ? tCommand("submitting") : submissionNeedsReview ? tCommand("reviewRequired") : tCommon("generate")}</span>
+                        <span>{tCommon("generate")}</span>
                         <small className="block mt-1 text-[10px] font-extrabold tracking-[.08em] uppercase" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
                             {mode === "video" ? tCommon("video") : tCommon("image")}
                         </small>

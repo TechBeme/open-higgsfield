@@ -8,7 +8,7 @@ import { createModuleLoader } from "./test-module-loader.mjs";
 
 const configured = Boolean(process.env.TEST_POSTGRES_HOST && process.env.TEST_POSTGRES_DB && process.env.TEST_POSTGRES_USER);
 const required = process.env.REQUIRE_POSTGRES_TESTS === "1";
-const quote = (value) => value == null ? "NULL" : typeof value === "boolean" ? String(value) :
+const quote = (value) => Array.isArray(value) ? `ARRAY[${value.map(quote).join(",")}]` : value == null ? "NULL" : typeof value === "boolean" ? String(value) :
     typeof value === "number" ? String(value) : `'${String(value).replaceAll("'", "''")}'`;
 
 function psql(statement) {
@@ -127,6 +127,25 @@ test("PostgreSQL task migration, independent stores, claims and bounded public r
             assert.deepEqual(first.tasks.map((row) => row.task_id), ["page-c", "page-b"]);
             assert.equal(second.tasks[0].task_id, "page-a");
             await assert.rejects(one.listTasks("image", { cursor: "not-json" }), /ERR_INVALID_PAGINATION/);
+        });
+        await t.test("gallery batch edits preserve siblings, persist order and reject stale atomic writes", async () => {
+            for (const id of ["gallery-a", "gallery-b", "gallery-c"]) await one.createTask(fixture(id, { status: "COMPLETED", lifecycle_phase: "terminal", next_poll_at: null,
+                result_urls: ["https://synthetic.invalid/0.png", "https://synthetic.invalid/1.png"] }));
+            await one.mutateGallery("delete", "image", [{ taskId: "gallery-a", index: 0 }, { taskId: "gallery-b", index: 1 }]);
+            assert.deepEqual((await two.getTask("gallery-a")).gallery.removed, [0]);
+            assert.equal((await two.getTask("gallery-a")).result_urls.length, 2);
+            await one.mutateGallery("reorder", "image", [{ taskId: "gallery-c", index: 1 }, { taskId: "gallery-b", index: 0 }, { taskId: "gallery-a", index: 1 }]);
+            const pages = await two.listTasks("image", { limit: 50 });
+            const ordered = pages.tasks.filter(task => task.task_id.startsWith("gallery-"));
+            assert.deepEqual(ordered.map(task => task.task_id), ["gallery-c", "gallery-b", "gallery-a"]);
+            const pg = newProcess().load("@/server/tasks/postgres");
+            const currentA = await one.getTask("gallery-a"), currentB = await one.getTask("gallery-b");
+            const stalePatches = [currentA, currentB].map(task => ({ id: task.task_id, revision: task.revision, gallery: { removed: [0, 1], order: {} }, remove: true }));
+            await two.mutateGallery("delete", "image", [{ taskId: "gallery-a", index: 1 }]);
+            assert.equal(await exec("SELECT NOT (payload ? 'result_urls' OR payload ? 'provider_operation') FROM generation_tasks WHERE task_id = 'gallery-a';"), "t", "The final removal clears media and provider payloads");
+            assert.equal(await pg.applyPersistedGallery(stalePatches), false);
+            assert.ok(await one.getTask("gallery-b"), "A stale row must prevent every write in that batch");
+            await one.mutateGallery("delete", "image", [{ taskId: "gallery-a", index: 1 }]);
         });
         await t.test("database emptiness and outage never load local JSON", async () => {
             let localReads = 0;

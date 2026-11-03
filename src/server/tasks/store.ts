@@ -6,7 +6,9 @@ import { randomUUID } from "node:crypto";
 import type { AnyTask, MediaType } from "@/types";
 import { STORAGE_ROOT } from "@/server/config/storage-paths";
 import { claimPersistedTask, createPersistedTask, deletePersistedTask, ensureTaskSchema, isDatabaseConfigured,
-    listPersistedTasks, readPersistedTask, readPublicPersistedTask, updatePersistedTask } from "@/server/tasks/postgres";
+    listPersistedTasks, readPersistedTask, readPublicPersistedTask, updatePersistedTask, applyPersistedGallery, readGalleryTasks } from "@/server/tasks/postgres";
+import { galleryPatches } from "./gallery";
+import type { GalleryAction, GalleryReference } from "@/lib/gallery";
 import { compareTaskOrder, hasOperation, isDue, makePage, normalizeTask, pageOptions, publicTask,
     type NewTaskRecord, type TaskPage, type TaskRecord } from "@/server/tasks/record";
 import { observationDeadline, withSignal } from "@/server/tasks/runtime";
@@ -136,6 +138,26 @@ export async function deleteTask(id: string): Promise<boolean> {
     }));
 }
 
+export async function mutateGallery(action: GalleryAction, mediaType: MediaType, items: GalleryReference[]): Promise<number> {
+    const now = Date.now();
+    if (isDatabaseConfigured()) {
+        const rows = new Map((await readGalleryTasks([...new Set(items.map(item => item.taskId))])).map(task => [task.task_id, task]));
+        const patches = galleryPatches(rows, action, mediaType, items, now);
+        if (patches.length && !await applyPersistedGallery(patches)) throw new Error("ERR_GALLERY_CONFLICT");
+        return now;
+    }
+    await mutateFile(rows => {
+        for (const patch of galleryPatches(rows, action, mediaType, items, now)) {
+            const current = rows.get(patch.id)!;
+            rows.set(patch.id, patch.remove ? { task_id: current.task_id, model_id: "", media_type: current.media_type, created_at: current.created_at, revision: current.revision + 1,
+                deleted_at: new Date().toISOString(), status: "CANCELLED", lifecycle_phase: "terminal", next_poll_at: null,
+                deadline_at: null, poll_failures: 0, lease_token: null, lease_expires_at: null, _done: true } : { ...current, gallery: patch.gallery, revision: current.revision + 1 });
+        }
+        return true;
+    });
+    return now;
+}
+
 export async function claimTask(token: string, leaseMs: number, id?: string, options: { signal?: AbortSignal } = {}): Promise<TaskRecord | undefined> {
     if (isDatabaseConfigured()) return claimPersistedTask(token, leaseMs, id, options.signal);
     return mutateFile((rows) => {
@@ -154,7 +176,7 @@ export async function listTasks(media: MediaType, options: { limit?: number; cur
     if (isDatabaseConfigured()) return makePage(await listPersistedTasks(media, limit, cursor), limit);
     await file.queue; await initFile();
     const rows = [...file.rows.values()].filter((task) => !task.deleted_at && task.media_type === media &&
-        (!cursor || compareTaskOrder(task, { created_at: cursor.createdAt, task_id: cursor.taskId }) < 0))
+        (!cursor || compareTaskOrder(task, { created_at: cursor.createdAt, task_id: cursor.taskId, gallery_sort: cursor.order }) < 0))
         .sort((a, b) => compareTaskOrder(b, a)).slice(0, limit + 1);
     return makePage(rows, limit);
 }

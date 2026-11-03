@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AnyTask, TaskEvent, TaskPhase } from "@/types";
 import { safeErrorCode } from "@/server/tasks/runtime";
+import { galleryTaskRank } from "@/lib/gallery";
 
 
 export type TaskRecord = AnyTask & {
@@ -15,7 +16,7 @@ export type TaskRecord = AnyTask & {
     deleted_at: string | null;
 };
 export type NewTaskRecord = Omit<TaskRecord, "revision">;
-export interface TaskCursor { createdAt: string; taskId: string }
+export interface TaskCursor { createdAt: string; taskId: string; order?: number }
 export interface TaskPage { tasks: AnyTask[]; nextCursor: string | null }
 
 const STOPPED = new Set<TaskPhase>(["terminal", "paused", "submission_unknown"]);
@@ -114,6 +115,10 @@ export function publicTask(task: AnyTask & { revision?: number; lifecycle_phase?
         has_download: hasDownload,
         result_count: count,
         revision: task.revision,
+        gallery: task.gallery && {
+            removed: (task.gallery.removed ?? []).filter(index => Number.isInteger(index) && index >= 0 && index < count),
+            order: Object.fromEntries(Object.entries(task.gallery.order ?? {}).filter(([key, value]) => /^(task|[0-9]|1[0-5])$/.test(key) && typeof value === "number" && Number.isFinite(value)).slice(0, 17)),
+        },
     };
     return task.media_type === "image"
         ? { ...base, media_type: "image", result_urls: Array.from({ length: count }, (_, i) => `/api/download/${encodeURIComponent(task.task_id)}?index=${i}`) }
@@ -138,7 +143,8 @@ export function pageOptions(options: { limit?: number; cursor?: string } = {}): 
         if (options.cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(options.cursor)) throw new Error();
         const cursor = JSON.parse(Buffer.from(options.cursor, "base64url").toString("utf8")) as TaskCursor;
         if (typeof cursor.createdAt !== "string" || !Number.isFinite(Date.parse(cursor.createdAt)) ||
-            typeof cursor.taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(cursor.taskId)) throw new Error();
+            typeof cursor.taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(cursor.taskId) ||
+            (cursor.order !== undefined && (typeof cursor.order !== "number" || !Number.isFinite(cursor.order)))) throw new Error();
         return { limit, cursor: { ...cursor, createdAt: new Date(cursor.createdAt).toISOString() } };
     } catch { throw new Error("ERR_INVALID_PAGINATION"); }
 }
@@ -149,7 +155,7 @@ export function makePage(rows: AnyTask[], limit: number): TaskPage {
     return {
         tasks,
         nextCursor: rows.length > limit && last
-            ? Buffer.from(JSON.stringify({ createdAt: last.created_at, taskId: last.task_id })).toString("base64url") : null,
+            ? Buffer.from(JSON.stringify({ createdAt: last.created_at, taskId: last.task_id, order: galleryTaskRank(last) })).toString("base64url") : null,
     };
 }
 
@@ -158,7 +164,9 @@ export function isDue(task: TaskRecord, now: number): boolean {
         Date.parse(task.next_poll_at!) <= now && (!task.lease_expires_at || Date.parse(task.lease_expires_at) <= now);
 }
 
-export function compareTaskOrder(a: { created_at: string; task_id: string }, b: { created_at: string; task_id: string }): number {
+export function compareTaskOrder(a: { created_at: string; task_id: string; gallery_sort?: number }, b: { created_at: string; task_id: string; gallery_sort?: number }): number {
+    const aRank = a.gallery_sort ?? galleryTaskRank(a as AnyTask), bRank = b.gallery_sort ?? galleryTaskRank(b as AnyTask);
+    if (aRank !== bRank) return aRank < bRank ? 1 : -1;
     if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
     return a.task_id === b.task_id ? 0 : a.task_id < b.task_id ? -1 : 1;
 }

@@ -76,6 +76,7 @@ function durableRedirect(value: string, task: AnyTask, index: number): string | 
 
 export async function taskAssetSource(task: AnyTask, index: number, options: TransferOptions = {}): Promise<Source> {
     assertAssetId(task.task_id);
+    if (task.gallery?.removed.includes(index)) throw new AssetError("ERR_ASSET_NOT_FOUND", 404);
     assetIndex(index, taskAssetCount(task));
     const signal = transferSignal(options.signal);
     const local = task.media_type === "image" ? task.result_paths?.[index] : task.video_path;

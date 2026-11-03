@@ -7,6 +7,7 @@ import type { GeneratedAsset } from "@/providers/types";
 import { assertAssetId, cloudinaryConfiguration, saveDownload, uploadCloudinary } from "@/server/media/storage";
 import { assertInputFileSize, detectMediaMime, fetchRemoteMedia, mediaExtension, mediaByteLimit,
     transferSignal, type TransferOptions } from "@/server/media/transfer";
+import { rasterizeVectorOutput } from "@/server/media/vector-output";
 
 export function assertGeneratedStorageConfigured(): "local" | "cloudinary" {
     const configured = process.env.ASSET_STORAGE_MODE;
@@ -36,6 +37,9 @@ async function materializeAsset(asset: GeneratedAsset, mediaType: "image" | "vid
         const fetched = await fetchRemoteMedia(asset.url, { signal, maxBytes: mediaByteLimit(`${mediaType}/`) });
         data = fetched.data;
         declared ??= fetched.mimeType;
+    }
+    if (mediaType === "image" && declared === "image/svg+xml") {
+        return { data: await rasterizeVectorOutput(data, signal), mimeType: "image/png" };
     }
     const mimeType = detectMediaMime(data, declared);
     if (!mimeType.startsWith(`${mediaType}/`)) throw new Error("ERR_UNSUPPORTED_MEDIA_TYPE");

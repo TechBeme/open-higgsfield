@@ -121,7 +121,7 @@ test("credential-free development requires loopback configuration and request ev
 
 test("every real protected route denies unauthorized requests before downstream work", async () => {
     const paths = [
-        ["generate", "POST"], ["generate-image", "POST"], ["tasks", "GET"], ["image-tasks", "GET"],
+        ["generate", "POST"], ["generate-image", "POST"], ["tasks", "GET"], ["image-tasks", "GET"], ["gallery", "PATCH"],
         ["tasks/[taskId]", "GET"], ["tasks/[taskId]", "POST"], ["tasks/[taskId]", "DELETE"],
         ["image-tasks/[taskId]", "GET"], ["image-tasks/[taskId]", "POST"], ["image-tasks/[taskId]", "DELETE"],
         ["events/[taskId]", "GET"], ["download/[taskId]", "GET"], ["uploaded/[filename]", "GET"],

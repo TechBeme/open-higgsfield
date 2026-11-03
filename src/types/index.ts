@@ -40,6 +40,7 @@ export interface TaskEvent {
 }
 
 interface TaskLifecycleFields {
+    gallery?: { removed: number[]; order: Record<string, number> };
     revision?: number;
     lifecycle_phase?: TaskPhase;
     recovery_required?: boolean;

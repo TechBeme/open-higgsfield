@@ -37,6 +37,31 @@ test("Gateway discovery uses the public model catalog without reading or sending
     assert.equal(f.calls.saves[0].providerId, "vercel-ai-gateway");
 });
 
+test("Runware discovery verifies connection ownership and persists AIR identifiers and media types", async () => {
+    for (const providerId of ["google-ai-studio", "runware"]) {
+        const f = fixture({ connection: { id: "conn_runware", providerId, secret: "synthetic-runware-key" }, fetcher: async (url, init) => {
+            assert.equal(url, "https://api.runware.ai/v1");
+            assert.equal(init.headers.Authorization, "Bearer synthetic-runware-key");
+            const task = JSON.parse(init.body)[0];
+            assert.equal(task.taskType, "modelSearch");
+            return Response.json({ data: [{ taskUUID: task.taskUUID, taskType: task.taskType, totalResults: 1,
+                results: [{ air: "bfl:flux@3-image", name: "FLUX 3 Image", category: "checkpoint", capabilities: ["io:text-to-image"] }] }] });
+        } });
+        const response = await f.post({ providerId: "runware", connectionId: "conn_runware" });
+        if (providerId !== "runware") {
+            assert.equal(response.status, 400); assert.equal(f.calls.fetch.length + f.calls.saves.length, 0);
+        } else {
+            assert.equal(response.status, 200);
+            assert.equal(f.calls.saves[0].models[0].providerModelId, "bfl:flux@3-image");
+            assert.equal(f.calls.saves[0].models[0].mediaType, "image");
+            assert.equal((await response.json()).status, "unverified");
+        }
+    }
+    const missing = fixture();
+    assert.equal((await missing.post({ providerId: "runware" })).status, 400);
+    assert.equal(missing.calls.fetch.length + missing.calls.saves.length, 0);
+});
+
 test("Google discovery without a configured key fails before any provider request", async () => {
     const f = fixture();
     const response = await f.post({ providerId: "google-ai-studio" });

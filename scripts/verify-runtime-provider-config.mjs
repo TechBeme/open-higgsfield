@@ -82,7 +82,7 @@ test("removed Freepik connections and custom models cannot reenter the runtime c
         const definitions = loader.load("src/providers/definitions.ts");
         const catalog = loader.load("src/server/catalog/runtime.ts");
         assert.equal(definitions.isProviderId("freepik"), false);
-        assert.equal(definitions.PROVIDER_DEFINITIONS.length, 5);
+        assert.equal(definitions.PROVIDER_DEFINITIONS.length, 6);
         assert.deepEqual(Array.from(await store.listProviderConnections()), []);
         assert.equal(await store.getProviderConnection("retired_connection"), undefined);
         assert.equal(await store.selectProviderConnection("freepik"), undefined);

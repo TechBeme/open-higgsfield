@@ -3,6 +3,7 @@ import { getProviderConnection, markProviderConnectionHealth } from "@/server/co
 import { applyWorkspaceHeaders, guardWorkspaceRequest } from "@/server/security/workspace-access";
 import { providerConfigFailure } from "@/server/http/provider-config";
 import { assertEmptyBody, RequestLimitError } from "@/server/http/request-limits";
+import { testRunwareConnection } from "@/server/providers/runware-client";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         const connection = await getProviderConnection(id);
         signal.throwIfAborted();
         if (!connection?.secret) return applyWorkspaceHeaders(NextResponse.json({ status: "unconfigured", error: "ERR_PROVIDER_CONNECTION_NOT_CONFIGURED" }, { status: 400 }));
+        if (connection.providerId === "runware") {
+            try {
+                await testRunwareConnection(connection, signal);
+                signal.throwIfAborted();
+                await markProviderConnectionHealth(id, "healthy").catch(() => undefined);
+                return applyWorkspaceHeaders(NextResponse.json({ status: "healthy" }));
+            } catch (error) {
+                signal.throwIfAborted();
+                await markProviderConnectionHealth(id, "unhealthy").catch(() => undefined);
+                throw error;
+            }
+        }
         if (connection.providerId === "vercel-ai-gateway" || connection.providerId === "google-ai-studio") {
             const gateway = connection.providerId === "vercel-ai-gateway";
             const headers: Record<string, string> = { Accept: "application/json", ...(gateway ? { Authorization: `Bearer ${connection.secret}` } : { "x-goog-api-key": connection.secret }) };

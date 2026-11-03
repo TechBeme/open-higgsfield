@@ -4,6 +4,7 @@ import { useRef } from "react";
 import useSWRInfinite, { unstable_serialize } from "swr/infinite";
 import { mutate as globalMutate } from "swr";
 import type { AnyTask } from "@/types";
+import { galleryIndices, type GalleryReference } from "@/lib/gallery";
 
 export interface HistoryPage<T extends AnyTask = AnyTask> { tasks: T[]; nextCursor: string | null }
 
@@ -60,7 +61,23 @@ export function useTaskHistory<T extends AnyTask>(key: ReturnType<typeof createH
         catch { /* SWR exposes the failure through error; keep loaded pages visible. */ }
         finally { loadingMore.current = false; }
     };
-    return { tasks: mergeHistoryPages(data), error, isLoading, mutate, loadMore, hasMore, isLoadingMore };
+    const removeGalleryItems = async (items: GalleryReference[]) => {
+        await mutate(pages => pages?.map(page => ({ ...page, tasks: page.tasks.flatMap(task => {
+            const removed = items.filter(item => item.taskId === task.task_id);
+            if (!removed.length) return [task];
+            if (removed.some(item => item.index === null)) return [];
+            const next = { ...task, gallery: { order: task.gallery?.order ?? {}, removed: [...new Set([...(task.gallery?.removed ?? []), ...removed.map(item => item.index!)])] } };
+            return galleryIndices(next).length ? [next] : [];
+        }) })), { revalidate: false });
+    };
+    const reorderGalleryItems = async (items: GalleryReference[], rankBase: number) => {
+        await mutate(pages => pages?.map(page => ({ ...page, tasks: page.tasks.map(task => {
+            const order = { ...task.gallery?.order };
+            items.forEach((item, position) => { if (item.taskId === task.task_id) order[String(item.index ?? "task")] = -rankBase + position / 1000; });
+            return { ...task, gallery: { removed: task.gallery?.removed ?? [], order } };
+        }) })), { revalidate: false });
+    };
+    return { tasks: mergeHistoryPages(data), error, isLoading, mutate, loadMore, hasMore, isLoadingMore, removeGalleryItems, reorderGalleryItems };
 }
 
 export function revalidateHistory(key: ReturnType<typeof createHistoryKey>) {
