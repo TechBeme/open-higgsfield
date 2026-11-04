@@ -88,7 +88,11 @@ for (const [locale, m] of Object.entries({ en, "pt-BR": pt, es })) {
         await page.getByRole("combobox", { name: m.tasks.filterGallery }).selectOption("failed");
         await expect(cards(page)).toHaveCount(1);
         await page.getByRole("combobox", { name: m.tasks.filterGallery }).selectOption("all");
-        await page.getByRole("button", { name: m.tasks.compactGrid, exact: true }).click();
+        // The size slider sits in the header on wider screens and inside view options on phones.
+        const before = (await card(page, "gallery-b:0").boundingBox())!.height;
+        await page.getByRole("slider", { name: m.tasks.densityLabel }).focus();
+        await page.keyboard.press("Home");
+        await expect.poll(async () => (await card(page, "gallery-b:0").boundingBox())!.height).toBeLessThan(before);
         await expectWithinViewport(page);
         await page.screenshot({ path: info.outputPath(`gallery-${locale}-compact.png`), fullPage: true });
         await page.getByRole("combobox", { name: m.tasks.sortGallery }).selectOption("oldest");
@@ -218,4 +222,49 @@ test("hover actions reuse a prompt and send an image to the composer as a refere
     await tile.getByRole("button", { name: en.tasks.moreActions, exact: true }).click();
     await page.getByRole("menuitem", { name: en.tasks.useAsReference, exact: true }).click();
     await expect(page.locator("[data-studio-composer]").getByRole("button", { name: en.commandBar.removeAttachment.replace("{name}", en.commandBar.urlReference) })).toBeVisible();
+});
+
+test("the preview size slider resizes the grid and is remembered after a reload", async ({ page }) => {
+    await gallery(page); await page.goto("/en");
+    await expect(cards(page)).toHaveCount(4);
+    if (touch()) await viewOptions(page);
+    const slider = page.getByRole("slider", { name: en.tasks.densityLabel });
+    const height = async () => (await card(page, "gallery-b:0").boundingBox())!.height;
+    const start = await height();
+    await slider.focus();
+    await page.keyboard.press("End");
+    await expect.poll(height).toBeGreaterThan(start);
+    const large = await height();
+    await page.reload();
+    await expect(cards(page)).toHaveCount(4);
+    await expect.poll(height).toBeCloseTo(large, 0);
+});
+
+test("the open preview reuses, copies and sends its image to the composer", async ({ page, context }, info) => {
+    if (info.project.name.includes("chromium")) await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await gallery(page); await page.goto("/en");
+    const open = async () => {
+        await card(page, "gallery-b:0").getByRole("button", { name: new RegExp(`^${en.tasks.preview} - `) }).click();
+        return page.getByRole("dialog");
+    };
+    let dialog = await open();
+    const toolbar = dialog.getByRole("toolbar", { name: en.tasks.previewActions });
+    await expect(toolbar.getByRole("link", { name: en.tasks.downloadImage })).toHaveAttribute("href", /\/api\/download\/gallery-b\?index=0/);
+    if (info.project.name.includes("chromium")) {
+        await toolbar.getByRole("button", { name: en.tasks.copyPrompt }).click();
+        await expect(dialog.getByRole("status").filter({ hasText: en.tasks.promptCopied })).toHaveCount(1);
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("A modern house in the forest");
+    }
+    await toolbar.getByRole("button", { name: en.tasks.reusePrompt }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator("[data-studio-composer]").getByRole("textbox")).toHaveValue("A modern house in the forest");
+    dialog = await open();
+    await dialog.getByRole("toolbar", { name: en.tasks.previewActions }).getByRole("button", { name: en.tasks.reference }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator("[data-studio-composer]").getByRole("button", { name: en.commandBar.removeAttachment.replace("{name}", en.commandBar.urlReference) })).toBeVisible();
+    dialog = await open();
+    await dialog.getByRole("toolbar", { name: en.tasks.previewActions }).getByRole("button", { name: en.tasks.delete }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await page.getByRole("alertdialog").getByRole("button", { name: en.tasks.cancel, exact: true }).click();
+    await expect(cards(page)).toHaveCount(4);
 });

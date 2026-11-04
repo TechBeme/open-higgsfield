@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, Check, CheckCheck, ChevronDown, Clapperboard, Copy, Download, ImagePlus, Loader2, MoreHorizontal, Play, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, Check, CheckCheck, ChevronDown, Clapperboard, Copy, Download, Image as ImageIcon, ImagePlus, Loader2, MoreHorizontal, Play, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useModelCopy } from "@/i18n/use-model-copy";
 import { useRuntimeModels } from "@/features/catalog/hooks/useRuntimeModels";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import { useStoredNumber } from "@/lib/use-stored-number";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { HeaderToolbar } from "@/components/layout/toolbar-slot";
@@ -25,6 +27,7 @@ export type ImageTarget = "reference" | "start" | "end";
 interface GalleryItem extends GalleryReference { task: AnyTask; model: string; preview?: PreviewItem }
 interface GalleryProps { mode: "image" | "video"; empty: React.ReactNode; onReusePrompt?: (prompt: string) => void; onSendImage?: (url: string, target: ImageTarget) => void }
 
+const ROW_MIN = 90, ROW_DEFAULT = 200, ROW_MAX = 420;
 const canReorder = (item: GalleryItem) => !["CREATED", "IN_PROGRESS"].includes(item.task.status ?? item.task.freepik_status ?? "CREATED");
 /** Remembers each output's real proportions so the justified rows do not jump when the gallery remounts. */
 const ratios = new Map<string, number>();
@@ -88,7 +91,8 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
     const [searchOpen, setSearchOpen] = useState(false);
     const [filter, setFilter] = useState("all");
     const [sort, setSort] = useState("custom");
-    const [compact, setCompact] = useState(false);
+    // Row height of the justified grid in pixels on wider screens; phones use 60% of it.
+    const [rowSize, setRowSize] = useStoredNumber("open-higgsfield:gallery-row-size", ROW_DEFAULT, ROW_MIN, ROW_MAX);
     const [saving, setSaving] = useState(false);
     const [arrangement, setArrangement] = useState<string[] | null>(null);
     const [dragging, setDragging] = useState<string | null>(null);
@@ -123,7 +127,7 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
     const reorderable = sort === "custom" && !saving;
     const allSelected = visible.length > 0 && visible.every(item => selected.has(galleryKey(item)));
     const hasContent = cards.length > 0 || localSubmissions.length > 0;
-    const viewChanged = filter !== "all" || sort !== "custom" || compact;
+    const viewChanged = filter !== "all" || sort !== "custom";
     const mutationError = (code: string | null) => code && errors.has(code) ? errors(code!) : t("deleteError");
 
     function toggle(item: GalleryItem, range = false) {
@@ -204,6 +208,12 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
                 className="h-9 w-full min-w-0 rounded-lg border border-white/10 bg-[#141618] pl-8 pr-8 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/60 sm:h-8 sm:w-44 lg:w-64 [&::-webkit-search-cancel-button]:hidden" />
             {(search || searchOpen) && <button type="button" aria-label={t("clearSearch")} onMouseDown={event => event.preventDefault()} onClick={() => { setSearch(""); setSearchOpen(false); }} className="absolute right-1.5 grid size-6 place-items-center rounded-md text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button>}
         </div>
+        {/* Preview size, like a photo app's zoom slider; phones get the same control inside the view options. */}
+        <div className="mx-1 hidden w-32 items-center gap-2 text-muted-foreground md:flex lg:w-40" title={t("densityLabel")}>
+            <ImageIcon aria-hidden="true" className="size-3 shrink-0" />
+            <Slider min={ROW_MIN} max={ROW_MAX} step={10} value={[rowSize]} onValueChange={value => setRowSize(Array.isArray(value) ? value[0] : value)} thumbLabel={t("densityLabel")} />
+            <ImageIcon aria-hidden="true" className="size-4 shrink-0" />
+        </div>
         {!searchOpen && <Button type="button" variant="ghost" size="icon-sm" className="sm:hidden" aria-label={t("searchGallery")} title={t("searchGallery")} onClick={() => setSearchOpen(true)}><Search className="size-4" /></Button>}
         <Popover>
             <PopoverTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t("viewOptions")} title={t("viewOptions")} className="relative" />}>
@@ -216,8 +226,10 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
                 <label className="grid gap-1.5 text-[11px] font-medium text-muted-foreground">{t("orderLabel")}
                     <select aria-label={t("sortGallery")} value={sort} onChange={event => setSort(event.target.value)} className="h-9 rounded-lg border border-white/10 bg-[#0d0f10] px-2.5 text-sm text-foreground">{["custom", "newest", "oldest"].map(value => <option key={value} value={value}>{t(`sorts.${value}`)}</option>)}</select>
                 </label>
-                <div className="grid grid-cols-2 gap-1 rounded-lg bg-[#0d0f10] p-1" role="group" aria-label={t("densityLabel")}>
-                    {[false, true].map(value => <button key={String(value)} type="button" aria-pressed={compact === value} onClick={() => setCompact(value)} className={`h-8 rounded-md text-xs font-medium ${compact === value ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{t(value ? "compactGrid" : "comfortableGrid")}</button>)}
+                <div className="grid gap-2.5 text-[11px] font-medium text-muted-foreground md:hidden">{t("densityLabel")}
+                    <div className="flex items-center gap-2.5 px-1"><ImageIcon aria-hidden="true" className="size-3 shrink-0" />
+                        <Slider min={ROW_MIN} max={ROW_MAX} step={10} value={[rowSize]} onValueChange={value => setRowSize(Array.isArray(value) ? value[0] : value)} thumbLabel={t("densityLabel")} />
+                        <ImageIcon aria-hidden="true" className="size-4 shrink-0" /></div>
                 </div>
             </PopoverContent>
         </Popover>
@@ -235,7 +247,7 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
         {history.isLoading && <p role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{t("loadingHistory")}</p>}
         {history.error && <div role="alert" className="mx-auto max-w-2xl p-6 text-center text-sm text-destructive"><p>{t("historyError")}</p><Button type="button" variant="outline" className="mt-4" onClick={() => void history.mutate().catch(() => undefined)}>{t("retryHistory")}</Button></div>}
         {error && !deleting && <p role="alert" className="px-3 pt-2 text-xs text-destructive">{errors.has(error) ? errors(error) : t("orderError")}</p>}
-        {!hasContent && !history.isLoading && !history.error ? empty : hasContent && <div className={`flex flex-wrap gap-1 p-1 sm:gap-1.5 sm:p-1.5 ${compact ? "[--row:80px] sm:[--row:130px] xl:[--row:160px]" : "[--row:112px] sm:[--row:190px] xl:[--row:230px]"}`}>
+        {!hasContent && !history.isLoading && !history.error ? empty : hasContent && <div data-gallery-grid style={{ "--row-size": `${rowSize}px` } as React.CSSProperties} className="flex flex-wrap gap-1 p-1 [--row:calc(var(--row-size)*0.6)] sm:gap-1.5 sm:p-1.5 sm:[--row:var(--row-size)]">
             {localSubmissions.map(item => <SubmissionTile key={item.id} submission={item} ratio={mode === "video" ? 16 / 9 : 1} />)}
             {visible.map(item => {
                 const key = galleryKey(item), position = sortable.findIndex(candidate => galleryKey(candidate) === key);
@@ -265,7 +277,17 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
         </div>}
         {history.hasMore && <div className="flex justify-center p-5"><Button type="button" variant="outline" disabled={history.isLoadingMore || Boolean(history.error)} onClick={() => void history.loadMore()}>{history.isLoadingMore && <Loader2 className="animate-spin" />}{t(history.isLoadingMore ? "loadingHistory" : "loadMore")}</Button></div>}
         <ConfirmDialog returnFocus={deleteOpener} open={Boolean(deleting)} onClose={() => { if (!busy) { setDeleting(null); setError(null); } }} onConfirm={() => void remove()} busy={busy} title={deleting?.length === 1 ? t("deleteTitle") : t("deleteManyTitle", { count: deleting?.length ?? 0 })} description={t("deleteAssetsHint")} error={error && deleting ? mutationError(error) : undefined} confirmLabel={t("deleteConfirm")} cancelLabel={t("cancel")} />
-        {preview && preview.index >= 0 && <Lightbox items={preview.items} index={preview.index} returnFocus={opener} onClose={() => setPreview(null)} onNext={() => setPreview(current => current && ({ ...current, index: (current.index + 1) % current.items.length }))} onPrev={() => setPreview(current => current && ({ ...current, index: (current.index - 1 + current.items.length) % current.items.length }))} />}
+        {preview && preview.index >= 0 && <Lightbox items={preview.items} index={preview.index} returnFocus={opener} actions={{
+            onReusePrompt: onReusePrompt ? item => item.prompt && onReusePrompt(item.prompt) : undefined,
+            onSendImage: onSendImage ? (item, target) => onSendImage(item.url, target) : undefined,
+            onDelete: item => {
+                const owner = cards.find(card => card.preview?.url === item.url);
+                if (!owner) return;
+                setPreview(null); setError(null);
+                deleteOpener.current = resultsRegion.current;
+                setDeleting([{ taskId: owner.taskId, index: owner.index }]);
+            },
+        }} onClose={() => setPreview(null)} onNext={() => setPreview(current => current && ({ ...current, index: (current.index + 1) % current.items.length }))} onPrev={() => setPreview(current => current && ({ ...current, index: (current.index - 1 + current.items.length) % current.items.length }))} />}
     </section>;
 }
 

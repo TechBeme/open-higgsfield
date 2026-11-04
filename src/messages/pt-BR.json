@@ -158,8 +158,6 @@
     "dismissSubmission": "Dispensar aviso desta solicitação",
     "dragImageHint": "Clique para ampliar · Arraste sobre outra imagem para reorganizar ou para o prompt para reutilizar",
     "loadedCount": "{count, plural, one {# item carregado} other {# itens carregados}}",
-    "comfortableGrid": "Prévias maiores",
-    "compactGrid": "Grade compacta",
     "searchGallery": "Buscar nas criações carregadas",
     "filterGallery": "Filtrar criações",
     "sortGallery": "Ordenar criações",
@@ -207,7 +205,11 @@
     "densityLabel": "Tamanho das prévias",
     "clearSearch": "Limpar busca",
     "moveBefore": "Mover para antes",
-    "moveAfter": "Mover para depois"
+    "moveAfter": "Mover para depois",
+    "copyPrompt": "Copiar prompt",
+    "promptCopied": "Prompt copiado",
+    "copyFailed": "Não foi possível copiar",
+    "previewActions": "Ações da imagem"
   },
   "errors": {
     "ERR_NO_API_KEY": "Conecte uma conta em Provedores antes de gerar.",
