@@ -810,7 +810,7 @@ export function CommandBar({ mode, onModeChange, suggestion, incoming, onPromptS
                     <button
                         type="submit"
                         disabled={modelUnavailable}
-                        className="w-full min-h-12 shrink-0 self-center border-none rounded-[22px] font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed sm:w-[146px] sm:min-h-[88px]"
+                        className="flex w-full min-h-11 shrink-0 items-center justify-center gap-2 self-center border-none rounded-[18px] font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed sm:w-[146px] sm:min-h-[88px] sm:flex-col sm:gap-0 sm:rounded-[22px]"
                         style={{
                             background: "linear-gradient(180deg, #d5ff47, #bcf122)",
                             color: "#0b1118",
@@ -821,7 +821,7 @@ export function CommandBar({ mode, onModeChange, suggestion, incoming, onPromptS
                         }}
                     >
                         <span>{tCommon("generate")}</span>
-                        <small className="block mt-1 text-[10px] font-extrabold tracking-[.08em] uppercase" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
+                        <small className="text-[10px] font-extrabold tracking-[.08em] uppercase opacity-80 sm:mt-1 sm:opacity-100" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
                             {mode === "video" ? tCommon("video") : tCommon("image")}
                         </small>
                     </button>
