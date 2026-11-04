@@ -810,7 +810,7 @@ export function CommandBar({ mode, onModeChange, suggestion, incoming, onPromptS
                     <button
                         type="submit"
                         disabled={modelUnavailable}
-                        className="flex w-full min-h-11 shrink-0 items-center justify-center gap-2 self-center border-none rounded-[18px] font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed sm:w-[146px] sm:min-h-[88px] sm:flex-col sm:gap-0 sm:rounded-[22px]"
+                        className="flex w-full min-h-11 shrink-0 items-center justify-center gap-[.3em] self-center border-none rounded-[18px] font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed sm:w-[146px] sm:min-h-[88px] sm:flex-col sm:gap-0 sm:rounded-[22px]"
                         style={{
                             background: "linear-gradient(180deg, #d5ff47, #bcf122)",
                             color: "#0b1118",
@@ -821,7 +821,8 @@ export function CommandBar({ mode, onModeChange, suggestion, incoming, onPromptS
                         }}
                     >
                         <span>{tCommon("generate")}</span>
-                        <small className="text-[10px] font-extrabold tracking-[.08em] uppercase opacity-80 sm:mt-1 sm:opacity-100" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
+                        {/* Phones read it as one phrase in the button's own type; wider screens show the small caps label below. */}
+                        <small className="text-[length:inherit] font-[inherit] lowercase sm:mt-1 sm:font-[family-name:var(--font-manrope)] sm:text-[10px] sm:font-extrabold sm:tracking-[.08em] sm:uppercase">
                             {mode === "video" ? tCommon("video") : tCommon("image")}
                         </small>
                     </button>
