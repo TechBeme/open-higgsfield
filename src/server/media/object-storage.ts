@@ -43,14 +43,15 @@ export function blobConfiguration() {
     // paired with BLOB_STORE_ID. A static read-write token remains supported
     // for local development and non-Vercel hosts.
     const rawStoreId = process.env.BLOB_STORE_ID ?? /^vercel_blob_rw_([A-Za-z0-9]+)_/.exec(token ?? "")?.[1];
-    const storeId = rawStoreId?.replace(/^store_/, "").toLowerCase();
+    const sdkStoreId = rawStoreId?.replace(/^store_/, "");
+    const storeId = sdkStoreId?.toLowerCase();
     if ((!printable(token, 4096) && !oidcAvailable) || !storeId || !/^[a-z0-9]{1,64}$/.test(storeId)) throw new Error("ERR_VERCEL_BLOB_NOT_CONFIGURED");
     const access = accessMode();
-    return { token, storeId, oidcAvailable, access, origin: `https://${storeId}.${access}.blob.vercel-storage.com` };
+    return { token, storeId, sdkStoreId, oidcAvailable, access, origin: `https://${storeId}.${access}.blob.vercel-storage.com` };
 }
 
 function blobAuth(config: ReturnType<typeof blobConfiguration>) {
-    return { storeId: config.storeId, ...(config.token ? { token: config.token } : {}) };
+    return { storeId: config.sdkStoreId, ...(config.token ? { token: config.token } : {}) };
 }
 
 export function s3Configuration() {
