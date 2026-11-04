@@ -1,6 +1,6 @@
 # Dependency and runtime policy
 
-Last reviewed: 2026-10-31.
+Last reviewed: 2026-11-04.
 
 ## Supported runtime
 
@@ -93,7 +93,7 @@ Independent QA accepted the following development-tooling exception on 2026-10-3
 | Installed copies | `node_modules/minimatch` 3.1.5 and `node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch` 10.2.4 |
 | Scope | Development-only lint/TypeScript tooling; audit also reports affected consumers as metapackages |
 | Compatibility limit | The fixed 11.0.1 release changes the contract used by legacy minimatch consumers; forcing it or downgrading ESLint is not an approved remediation |
-| Boundaries | Repository-controlled lint configuration, read-only CI permissions, 15-minute job timeout; no application endpoint accepting glob patterns was found |
+| Boundaries | Repository-controlled lint configuration, read-only CI permissions, 25-minute job timeout; no application endpoint accepting glob patterns was found |
 | Revisit | Compatible upstream fix/toolchain, introduction of untrusted glob input, or 2026-11-30, whichever comes first |
 | Review | Independently reviewed on 2026-10-31 within the boundaries above |
 
@@ -114,3 +114,26 @@ branch rule does not require a human approval count. Create a short-lived branch
 open a pull request, wait for the checked head's `quality` result, and merge that
 reviewed commit normally. Verify the final commit and successful checks after the
 merge.
+
+## Blob SDK transitive security patch (2026-11-04)
+
+`@vercel/blob` 2.8.2 resolves OIDC 3.8.10, which pins `@vercel/cli-config` 0.3.1
+and vulnerable Zod 4.1.11 (GHSA-mrhx-c7xc-m3w5). A narrowly scoped npm override
+selects the official cli-config 0.3.6 patch, whose Zod constraint is ^4.6.6.
+This retains the OIDC major required by Blob rather than forcing a major SDK
+upgrade or accepting a production advisory. Revisit the override when Blob's
+supported OIDC range includes an upstream corrected dependency chain. The
+lockfile, regression suite and both audit gates must pass with this override.
+
+## Workflow SDK transitive security patches (2026-11-04)
+
+`workflow` 5.3.0 introduces runtime/build dependencies with older Zod, Undici and
+minimatch pins. The committed overrides select the existing direct Zod 4.6.7,
+Undici 7.30.1 for the vulnerable 7.30.0 copies, and minimatch 11.0.1 for
+`@vercel/queue`, `@oclif/core`, `@swc/cli` and `filelist`. These consumers were
+reviewed against their actual named `minimatch()` / `match()` APIs; regression
+tests exercise the resolved copies. Unlike the two legacy development copies
+above, these SDK consumers support the corrected contract. This adds no audit
+exception. Revisit overrides when upstream dependencies adopt fixed versions.
+Clean install, production build, SDK runtime smoke, regressions and both audit
+gates must pass; do not run concurrent npm mutations on one dependency tree.

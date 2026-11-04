@@ -8,10 +8,12 @@ import { assertAssetId, cloudinaryConfiguration, saveDownload, uploadCloudinary 
 import { assertInputFileSize, detectMediaMime, fetchRemoteMedia, mediaExtension, mediaByteLimit,
     transferSignal, type TransferOptions } from "@/server/media/transfer";
 import { rasterizeVectorOutput } from "@/server/media/vector-output";
+import { assertObjectStorageConfigured, uploadObject, type ObjectStorageMode } from "@/server/media/object-storage";
 
-export function assertGeneratedStorageConfigured(): "local" | "cloudinary" {
+export function assertGeneratedStorageConfigured(): "local" | "cloudinary" | ObjectStorageMode {
     const configured = process.env.ASSET_STORAGE_MODE;
     const mode = configured ?? (process.env.NODE_ENV !== "production" && !process.env.DATABASE_URL && !process.env.VERCEL ? "local" : undefined);
+    if (mode === "vercel-blob" || mode === "s3") return assertObjectStorageConfigured();
     if (mode !== "local" && mode !== "cloudinary") throw new Error("ERR_ASSET_STORAGE_NOT_CONFIGURED");
     if (mode === "local") {
         if (process.env.DATABASE_URL || process.env.VERCEL) throw new Error("ERR_DURABLE_ASSET_STORAGE_REQUIRED");
@@ -59,6 +61,9 @@ export async function attachGeneratedAssets(task: AnyTask, assets: GeneratedAsse
         if (mode === "cloudinary") {
             const hash = createHash("sha256").update(data).digest("hex");
             urls.push(await uploadCloudinary(data, `open-higgsfield/generated/${task.task_id}/${index}_${hash}`, mimeType, { signal }));
+        } else if (mode === "vercel-blob" || mode === "s3") {
+            const hash = createHash("sha256").update(data).digest("hex");
+            urls.push(await uploadObject(data, `open-higgsfield/generated/${task.task_id}/${index}_${hash}${mediaExtension(mimeType)}`, mimeType, { signal }));
         } else {
             paths.push(await saveDownload(task.task_id, `_${index}${mediaExtension(mimeType)}`, data, { signal }));
             urls.push(`/api/download/${task.task_id}${task.media_type === "image" ? `?index=${index}` : "?inline=1"}`);

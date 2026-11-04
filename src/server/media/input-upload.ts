@@ -6,6 +6,7 @@ import { assertSafeRemoteUrl } from "@/server/media/safe-url";
 import { assertInputFileSize, detectMediaMime, IMAGE_MAX_PIXELS, mediaExtension, transferSignal,
     type TransferOptions } from "@/server/media/transfer";
 import { withAbort } from "@/server/media/safe-url";
+import { inputObjectKey, objectStorageMode } from "@/server/media/object-storage";
 
 export async function toJpeg(buffer: Buffer, options: TransferOptions = {}): Promise<Buffer> {
     const signal = transferSignal(options.signal);
@@ -31,7 +32,8 @@ export interface ResolvedMedia { remoteUrl: string; localUrl: string }
 export async function processImageUpload(buffer: Buffer, options: TransferOptions = {}): Promise<ResolvedMedia> {
     const signal = transferSignal(options.signal);
     const jpeg = await toJpeg(buffer, { signal });
-    const localUrl = await saveInputLocally(jpeg, ".jpg", { signal });
+    const localUrl = objectStorageMode() ? `/api/uploaded/${inputObjectKey(jpeg, "image/jpeg").split("/").at(-1)}`
+        : await saveInputLocally(jpeg, ".jpg", { signal });
     const remoteUrl = await uploadToTmpfiles(jpeg, "image.jpg", "image/jpeg", { signal });
     return { remoteUrl, localUrl };
 }
@@ -41,7 +43,8 @@ export async function processFileUpload(buffer: Buffer, _filename: string, mimeT
     const mime = detectMediaMime(buffer, mimeType);
     assertInputFileSize(buffer.length, mime);
     const ext = mediaExtension(mime);
-    const localUrl = await saveInputLocally(buffer, ext, { signal });
+    const localUrl = objectStorageMode() ? `/api/uploaded/${inputObjectKey(buffer, mime).split("/").at(-1)}`
+        : await saveInputLocally(buffer, ext, { signal });
     const remoteUrl = await uploadToTmpfiles(buffer, `file${ext}`, mime, { signal });
     return { remoteUrl, localUrl };
 }

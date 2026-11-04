@@ -123,17 +123,17 @@ output quality, prices, refunds or settled charges.
 
 ## Reference media uploads
 
-Some providers require a public URL for asynchronous image/video inputs. Open-Higgsfield uses Cloudinary for this handoff.
+Some providers require a fetchable HTTPS URL for asynchronous image/video inputs.
+The configured Blob/S3 adapter supplies an exact-file link valid for 24 hours;
+private originals do not require public buckets. Legacy local mode still uses
+Cloudinary for external reference handoff.
 
 The multipart request guard is 4 MiB. References larger than that must be
 provided through a validated public HTTPS URL; the provider-specific byte limits
 shown in each catalog do not raise this application transport ceiling.
 
-```dotenv
-CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
-```
-
-You can alternatively configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` separately.
+See [media storage](storage.md) for the recommended private Blob/S3 configuration
+and the optional legacy Cloudinary settings.
 
 ## Adding a model
 

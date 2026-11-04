@@ -294,3 +294,20 @@ test("invalid historical custom contracts fail closed without mutation and can b
         assert.ok((await catalog.getAllRuntimeCapabilities("image")).length > 0);
     } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+
+test("queued submission cannot bypass a newly saved connection override with an old environment key", async t => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-env-key-"));
+    t.after(() => fs.rm(directory, { recursive: true, force: true }));
+    const store = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: directory,
+        PROVIDER_CONFIG_ENCRYPTION_KEY: "synthetic-provider-config-key-32-characters", RUNWARE_API_KEY: "synthetic-env-key" } }).load("@/server/config/provider-store");
+    const original = await store.resolveProviderConnection("runware");
+    assert.equal(original.id, "env:runware");
+    assert.equal((await store.getProviderConnection(original.id, { forSubmission: true })).secret, "synthetic-env-key");
+    const saved = await store.saveProviderConnection({ providerId: "runware", label: "Synthetic saved override", secret: "synthetic-saved-key", enabled: false });
+    assert.equal(await store.getProviderConnection(original.id, { forSubmission: true }), undefined);
+    assert.equal((await store.getProviderConnection(original.id)).secret, "synthetic-env-key", "Observing an already accepted operation retains its account");
+    await store.saveProviderConnection({ id: saved.id, providerId: "runware", enabled: true });
+    assert.equal(await store.getProviderConnection(original.id, { forSubmission: true }), undefined, "Do not switch to an unintended account");
+    assert.equal((await store.resolveProviderConnection("runware")).id, saved.id);
+});

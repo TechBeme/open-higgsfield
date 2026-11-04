@@ -27,7 +27,7 @@ export async function ensureTaskSchema(signal?: AbortSignal): Promise<void> {
     let rows: Record<string, unknown>[];
     try { rows = await query("SELECT version FROM generation_task_schema WHERE singleton = TRUE", [], signal); }
     catch (error) { if (signal?.aborted) throw error; throw new Error("ERR_TASK_SCHEMA_REQUIRED"); }
-    if (Number(rows[0]?.version) !== 2) throw new Error("ERR_TASK_SCHEMA_REQUIRED");
+    if (Number(rows[0]?.version) !== 3) throw new Error("ERR_TASK_SCHEMA_REQUIRED");
     schemaVerified = true;
 }
 
@@ -74,6 +74,16 @@ export async function readPersistedTask(id: string): Promise<TaskRecord | undefi
     await ensureTaskSchema();
     const rows = await query("SELECT * FROM generation_tasks WHERE task_id = $1 AND deleted_at IS NULL", [id]);
     return rows[0] ? record(rows[0]) : undefined;
+}
+
+export async function workflowCandidateIds(after?: string): Promise<string[]> {
+    await ensureTaskSchema();
+    const rows = await query(`SELECT task_id FROM generation_tasks WHERE deleted_at IS NULL
+        AND lifecycle_phase IN ('queued', 'submitting', 'polling', 'materializing')
+        AND (lifecycle_phase <> 'queued' OR payload->>'submission_ready' = 'true')
+        AND ($1::text IS NULL OR task_id > $1)
+        ORDER BY task_id LIMIT 20`, [after ?? null]);
+    return rows.map(row => String(row.task_id));
 }
 
 export async function readPublicPersistedTask(id: string): Promise<AnyTask | undefined> {
@@ -169,7 +179,8 @@ export async function claimPersistedTask(token: string, leaseMs: number, id?: st
     await ensureTaskSchema(signal);
     const rows = await query(`WITH candidate AS (
         SELECT task_id FROM generation_tasks WHERE deleted_at IS NULL
-        AND lifecycle_phase IN ('submitting', 'polling', 'materializing')
+        AND lifecycle_phase IN ('queued', 'submitting', 'polling', 'materializing')
+        AND (lifecycle_phase <> 'queued' OR payload->>'submission_ready' = 'true')
         AND next_poll_at <= NOW() AND (lease_expires_at IS NULL OR lease_expires_at <= NOW())
         AND ($3::text IS NULL OR task_id = $3)
         ORDER BY next_poll_at, task_id FOR UPDATE SKIP LOCKED LIMIT 1

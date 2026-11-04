@@ -27,7 +27,7 @@ src/
     providers/         provider SDK adapters and transport
     tasks/             task persistence, lifecycle and polling
     media/             bounded uploads, downloads and asset storage
-    security/          workspace and scheduler access control
+    security/          workspace and external-worker access control
     http/              request size and content handling
 ```
 
@@ -81,9 +81,11 @@ Magnific request schemas live in `src/server/catalog/magnific.ts`. Its provider 
 1. The user selects a model and fills the capability-driven controls.
 2. The API route delegates to the server generation handler, which validates the form and creates canonical parameters.
 3. The registry resolves the provider and upstream model ID.
-4. The provider returns generated assets or an asynchronous operation.
-5. Open-Higgsfield normalizes status updates and attaches completed assets to the task.
+4. On Vercel, persist an inactive queued task, admit its Workflow, then activate it and return HTTP 202. A durable step claims and submits once. Persistent local/external modes keep their direct submission path.
+5. The provider returns generated assets or an asynchronous operation. Workflow steps (or the selected observer) normalize status, retry safe observations and attach completed assets.
 6. The result feed receives updates and exposes reuse/download actions.
+
+Workflow events contain identifiers and timings, not prompts, keys or media. The SQL submission boundary prevents automatic paid resubmission after redelivery or a crash. Adaptive durable sleeps replace Vercel Cron. See [background execution](background-execution.md) for admission, expiration and manual recovery.
 
 ## Client data flow
 
@@ -91,7 +93,7 @@ SWR owns browser reads for runtime model catalogs and task history. The Studio n
 
 ## Storage
 
-PostgreSQL/Neon stores task metadata and durable media references, not new image bytes. Database/serverless deployments require Cloudinary storage with explicit public-delivery acknowledgement; its CDN originals remain public even when the studio is protected. Local mode supports one process with a persistent disk at `OPEN_HIGGSFIELD_STORAGE_DIR`. Outputs use content-addressed names so stale workers cannot replace newer media. Legacy inline records remain readable within deployment payload limits. See [storage](storage.md) for configuration, limits and migration.
+PostgreSQL/Neon stores task metadata and durable media references, not new image bytes. Database/serverless deployments require durable object storage: Vercel Blob (recommended), S3, or legacy Cloudinary. Blob/S3 default to private originals, stable application routes and expiring signed URLs for delivery/provider references. Legacy Cloudinary requires explicit public delivery. Local mode supports one process with a persistent disk at `OPEN_HIGGSFIELD_STORAGE_DIR`. Outputs use content-addressed names so stale workers cannot replace newer media. Legacy inline records remain readable within deployment payload limits. See [storage](storage.md) for configuration, limits and migration.
 
 ## Extension points
 

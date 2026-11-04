@@ -59,6 +59,9 @@ test("PostgreSQL task migration, independent stores, claims and bounded public r
         }
         await exec(migration);
         await exec(migration);
+        const workflowMigration = await fs.readFile(path.join(import.meta.dirname, "../migrations/0003_workflow_queue.sql"), "utf8");
+        await exec(workflowMigration);
+        await exec(workflowMigration);
         const transfers = [];
         const query = async (statement, values = []) => {
             const sql = statement.replace(/\$(\d+)/g, (_, index) => quote(values[Number(index) - 1]));
@@ -104,6 +107,41 @@ test("PostgreSQL task migration, independent stores, claims and bounded public r
             assert.equal(await one.updateTask({ ...old, status: "FAILED", lifecycle_phase: "terminal", next_poll_at: null }), undefined);
             await one.deleteTask("lease");
             assert.equal(await two.updateTask({ ...recovered, status: "COMPLETED", lifecycle_phase: "terminal", next_poll_at: null }), undefined);
+        });
+        await t.test("workflow admission gates SQL claims and only one worker crosses the submission boundary", async () => {
+            await one.createTask(fixture("workflow-queue", { lifecycle_phase: "queued", provider_operation: undefined,
+                submission_ready: false, submission_media: { images: [] } }));
+            assert.equal(await two.claimTask("premature", 120_000, "workflow-queue"), undefined);
+            assert.ok(!(await one.listWorkflowCandidateIds()).includes("workflow-queue"));
+            const queued = await one.getTask("workflow-queue");
+            const active = await one.updateTask({ ...queued, submission_ready: true });
+            assert.ok((await two.listWorkflowCandidateIds()).includes("workflow-queue"));
+            const claims = await Promise.all([one.claimTask("wf-a", 120_000, "workflow-queue"), two.claimTask("wf-b", 120_000, "workflow-queue")]);
+            assert.equal(claims.filter(Boolean).length, 1);
+            assert.equal(await two.updateTask({ ...active, submission_ready: false }), undefined, "A stale route cannot revoke an owned task");
+            const owner = claims.find(Boolean);
+            const committed = await one.updateTask({ ...owner, lifecycle_phase: "submitting", submission_media: undefined }, { releaseLease: false });
+            assert.ok(committed);
+            assert.equal((await two.getTask("workflow-queue")).lifecycle_phase, "submitting");
+            assert.equal((await two.getTask("workflow-queue")).submission_media, undefined);
+            assert.equal(await two.claimTask("duplicate", 120_000, "workflow-queue"), undefined);
+            const dto = await two.getPublicTask("workflow-queue");
+            assert.equal(dto.submission_media, undefined);
+            assert.equal(dto.submission_ready, undefined);
+            await one.deleteTask("workflow-queue");
+            assert.ok(!(await two.listWorkflowCandidateIds()).includes("workflow-queue"));
+        });
+        await t.test("workflow recovery keyset pagination reaches all accepted tasks beyond one batch", async () => {
+            const ids = Array.from({ length: 25 }, (_, i) => `zz-workflow-page-${String(i).padStart(2, "0")}`);
+            for (const id of ids) await one.createTask(fixture(id, { lifecycle_phase: "queued", submission_ready: true }));
+            await one.createTask(fixture("zz-workflow-page-unconfirmed", { lifecycle_phase: "queued", submission_ready: false }));
+            transfers.length = 0;
+            const page = await one.listWorkflowCandidateIds("zz-workflow-page-");
+            const rest = await two.listWorkflowCandidateIds(page.at(-1));
+            assert.equal(page.length, 20); assert.equal(rest.length, 5);
+            assert.deepEqual([...page, ...rest], ids);
+            assert.ok(transfers.every(row => row.bytes < 2000 && !/SELECT \*/.test(row.statement)));
+            for (const id of [...ids, "zz-workflow-page-unconfirmed"]) await one.deleteTask(id);
         });
         await t.test("large inline legacy payloads stay out of SQL list and SSE transport", async () => {
             const data = `data:image/png;base64,${"A".repeat(6 * 1024 * 1024)}`;

@@ -85,6 +85,10 @@ test("actual proxy covers APIs with extensions, image optimization and locale ro
         assert.equal(proxy(request(path, { authenticated: false })).status, 401, path);
     }
     assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}/_next/static/chunks/app.js` }), false);
+    assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}/.well-known/workflow/v1/flow` }), false);
+    for (const path of ["/.well-known/other", "/api/internal/reconcile-workflows", "/api/.well-known/workflow/secret"]) {
+        assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}${path}` }), true);
+    }
     const localized = proxy(request("/", { headers: { "accept-language": "pt-BR" } }));
     assert.equal(localized.status, 307);
     assert.match(localized.headers.get("location"), /\/pt-BR$/);
@@ -125,7 +129,7 @@ test("every real protected route denies unauthorized requests before downstream 
         ["tasks/[taskId]", "GET"], ["tasks/[taskId]", "POST"], ["tasks/[taskId]", "DELETE"],
         ["image-tasks/[taskId]", "GET"], ["image-tasks/[taskId]", "POST"], ["image-tasks/[taskId]", "DELETE"],
         ["events/[taskId]", "GET"], ["download/[taskId]", "GET"], ["uploaded/[filename]", "GET"],
-        ["save-to-gallery", "POST"], ["models", "GET"], ["image-models", "GET"], ["ready", "GET"],
+        ["internal/reconcile-workflows", "POST"], ["save-to-gallery", "POST"], ["models", "GET"], ["image-models", "GET"], ["ready", "GET"],
     ];
     for (const [path, method] of paths) {
         const h = harness();
@@ -332,4 +336,49 @@ test("submission parser preserves recovery on 202, task IDs on rejection and los
         assert.equal((await parseSubmissionResponse(response)).needsReview, true);
     }
     assert.equal(unknownSubmission().needsReview, true);
+});
+
+
+test("Workflow production requires the Vercel world and readiness does not claim execution proof", async () => {
+    const env = { VERCEL: "1", VERCEL_DEPLOYMENT_ID: "synthetic-deployment", DEPLOYMENT_PROFILE: "distributed",
+        DATABASE_URL: "synthetic", TASK_WORKER_MODE: "workflow" };
+    assert.equal(harness(env).load("@/server/config/production").assertRuntimeConfiguration().workerMode, "workflow");
+    assert.equal(harness({ ...env, TASK_WORKER_MODE: undefined }).load("@/server/config/production").assertRuntimeConfiguration().workerMode, "workflow");
+    for (const invalid of [{ VERCEL_DEPLOYMENT_ID: undefined }, { WORKFLOW_TARGET_WORLD: "local" }, { VERCEL: undefined }]) {
+        assert.throws(() => harness({ ...env, ...invalid }).load("@/server/config/production").assertRuntimeConfiguration(), /ERR_WORKFLOW_CONFIG/);
+    }
+    const ready = await harness(env).load("src/app/api/ready/route.ts").GET(request("/api/ready"));
+    const result = await ready.json();
+    assert.equal(result.ready, true); assert.equal(result.scheduler_heartbeat, "not_applicable");
+    assert.equal(result.workflow_execution, "unverified");
+});
+
+test("Workflow recovery is operator-only, bounded, paginates and redacts infrastructure failures", async () => {
+    const ids = Array.from({ length: 20 }, (_, i) => `synthetic-task-${String(i).padStart(2, "0")}`);
+    let scans = 0; let starts = 0; let cursor;
+    const env = { VERCEL: "1", VERCEL_DEPLOYMENT_ID: "synthetic-deployment", DEPLOYMENT_PROFILE: "distributed",
+        DATABASE_URL: "synthetic", TASK_WORKER_MODE: "workflow", CRON_SECRET: cronSecret };
+    const mocks = {
+        "@/server/tasks/store": { listWorkflowCandidateIds: async after => { scans++; cursor = after; return ids; }, getTask: async id => ({ task_id: id }) },
+        "@/server/tasks/workflow-dispatch": { startTaskWorkflow: async () => { starts++; } },
+    };
+    const h = harness(env, mocks);
+    const route = h.load("src/app/api/internal/reconcile-workflows/route.ts");
+    for (const authorization of ["", `Bearer ${cronSecret}`]) {
+        assert.equal((await route.POST(request("/api/internal/reconcile-workflows", { method: "POST", headers: { authorization } }))).status, 401);
+    }
+    assert.equal((await route.POST(request("/api/internal/reconcile-workflows", { method: "POST", headers: { origin: "https://evil.test" } }))).status, 403);
+    assert.equal((await route.POST(request("/api/internal/reconcile-workflows", { method: "POST", body: "{}" }))).status, 400);
+    for (const query of ["?limit=50", "?after=", "?after=x&after=y", "?after=bad%2Fid"]) {
+        assert.equal((await route.POST(request(`/api/internal/reconcile-workflows${query}`, { method: "POST" }))).status, 400);
+    }
+    assert.equal(scans + starts, 0);
+    const accepted = await route.POST(request("/api/internal/reconcile-workflows?after=previous-id", { method: "POST" }));
+    assert.equal(accepted.status, 200); assert.equal(cursor, "previous-id"); assert.equal(starts, 20);
+    assert.deepEqual(await accepted.json(), { started: 20, nextCursor: ids.at(-1) });
+    const failed = harness(env, { ...mocks, "@/server/tasks/workflow-dispatch": { startTaskWorkflow: async () => { throw new Error("private upstream token"); } } });
+    const response = await failed.load("src/app/api/internal/reconcile-workflows/route.ts").POST(request("/api/internal/reconcile-workflows", { method: "POST" }));
+    assert.equal(response.status, 503); assert.doesNotMatch(await response.text(), /private upstream token/);
+    const wrongMode = await harness({}, mocks).load("src/app/api/internal/reconcile-workflows/route.ts").POST(request("/api/internal/reconcile-workflows", { method: "POST" }));
+    assert.equal(wrongMode.status, 503);
 });
