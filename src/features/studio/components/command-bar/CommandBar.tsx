@@ -504,7 +504,7 @@ export function CommandBar({ mode, onModeChange, suggestion, incoming, onPromptS
                 {/* Mode rail */}
                 <div
                     role="group" aria-label={tCommand("mode")}
-                    className="flex w-fit gap-1 rounded-2xl border border-white/10 p-1 sm:w-auto sm:flex-col sm:p-1.5"
+                    className="flex w-fit justify-self-center gap-1 rounded-2xl border border-white/10 p-1 sm:w-auto sm:justify-self-stretch sm:flex-col sm:p-1.5"
                     style={{
                         background: "rgba(12,12,12,.88)",
                         boxShadow: "0 28px 80px rgba(0,0,0,.42)",

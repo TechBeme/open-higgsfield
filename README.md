@@ -63,15 +63,23 @@ Each provider has its own connections, priorities, and model visibility settings
 | --- | --- |
 | ![Google AI Studio connections and model visibility](docs/images/open-higgsfield-provider-detail-en.png) | ![Searchable Studio model picker in English](docs/images/open-higgsfield-models-en.png) |
 
+### Gallery and selection
+
+Search and filter your creations, adjust thumbnail size, zoom into a preview, reuse a prompt, or send an image back to the composer. Drag images to reorder them, or use the tile menu on touchscreens.
+
+After selecting one item, click anywhere on another image to select or deselect it. Drag from empty gallery space to draw a selection rectangle; with selection active, the gesture can also start on an image. Shift/Ctrl/Cmd preserves the existing selection while drawing, and Escape clears it. Download or delete selected items together.
+
+![Gallery with multiple selected images in English](docs/images/open-higgsfield-gallery-selection-en.png)
+
 ### Desktop and mobile Studio
 
-The same workspace supports image and video generation, with controls derived from each model's capabilities. Before a provider is connected, generation stays disabled and the setup action is visible.
+The compact composer keeps image/video mode, model selection, reference attachments, and model-specific settings together. On mobile, the mode selector sits above the composer. Generation runs in the background so you can start another creation while previous tasks finish. Without a connected provider and enabled model, generation stays disabled.
 
 <p align="center">
   <img src="docs/images/open-higgsfield-studio-mobile-en.png" alt="Open-Higgsfield Studio on mobile in English" width="320" />
 </p>
 
-Captured with Playwright from the production build in an isolated workspace. The connections and prompt are demonstration data; no real API keys, private media, or paid generations were used.
+Captured with Playwright from the production build in an isolated workspace. Connections, prompts, and coastal illustrations are demonstration fixtures, not live provider outputs. No real API keys, private media, or paid generations were used.
 
 ## Supported providers
 
@@ -86,7 +94,7 @@ Connect a provider from **Providers**, or configure its environment credentials.
 | ToAPIs | 51 | 51 | `TOAPIS_API_KEY` |
 | Runware | 191 | 110 | `RUNWARE_API_KEY` |
 
-Counts verified against `/api/catalog` on November 3, 2026. Entries include workflow variants, not just distinct upstream models. Only enabled models from connected providers appear in the Studio.
+Counts verified against `/api/catalog` on November 4, 2026. Entries include workflow variants, not just distinct upstream models. Only enabled models from connected providers appear in the Studio.
 
 The catalog includes Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image, and OmniHuman. Model availability, pricing, quotas, and preview access are controlled by each upstream provider.
 
@@ -103,7 +111,9 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - Native audio and multi-shot options where supported
 - Drag-and-drop, paste, upload, and public URL inputs
 - Normalized synchronous and asynchronous generation tasks
-- Live progress, reusable prompts, previews, and downloads
+- Background generation with live progress and independent task errors
+- Zoomable previews, reusable prompts, image references, and downloads
+- Searchable gallery with adjustable thumbnail size, persistent ordering, full-card selection, marquee selection, and bulk actions
 - Responsive desktop and mobile command interface
 - Interface in English, Brazilian Portuguese, and Spanish, with a persistent language selector
 - Multiple encrypted connections per provider, connection priorities, model visibility controls, and model discovery where supported
@@ -256,6 +266,8 @@ quota. Configure provider quotas/budgets and ingress controls before enabling
 work. Cloudinary media remains public by URL.
 
 Follow the [production operator guide](docs/production.md) for configuration, migration, scheduler verification and rollback before deploying.
+
+Updating an existing deployment? See the [Vercel update checklist](docs/deployment.md#updating-an-existing-vercel-deployment) for Git integration, environment settings, migrations, and verification. These gallery and mobile layout changes add no new environment variables or database migrations.
 
 ## Commands
 

@@ -214,6 +214,99 @@ test("shift range and keyboard selection operate on visible images without delet
     expect(mutations).toHaveLength(0);
 });
 
+test("selection mode toggles image surfaces and failed cards without opening preview", async ({ page }) => {
+    const { mutations } = await gallery(page); await page.goto("/en");
+    await card(page, "gallery-a:0").getByRole("checkbox").click();
+    await card(page, "gallery-b:0").click();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(2);
+    await card(page, "gallery-b:0").click();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(1);
+    // Failed outputs have no preview button, so the article itself is the selectable surface.
+    await card(page, "gallery-error:task").click();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(2);
+    await card(page, "gallery-error:task").click();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(1);
+    await card(page, "gallery-a:0").click();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(mutations).toHaveLength(0);
+    // Leaving selection mode restores the normal preview interaction.
+    await card(page, "gallery-a:0").click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+});
+
+test("marquee selection starts in empty gallery space without a prior selection", async ({ page }, info) => {
+    const { mutations } = await gallery(page); await page.goto("/en");
+    await expect(cards(page)).toHaveCount(4);
+    const grid = page.locator("[data-gallery-grid]");
+    const bounds = await grid.boundingBox();
+    const region = await page.getByRole("region", { name: en.tasks.feedTitle, exact: true }).boundingBox();
+    await page.mouse.move(region!.x + region!.width - 2, region!.y + region!.height - 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds!.x + 2, bounds!.y + 2, { steps: 8 });
+    await expect(page.locator("[data-gallery-marquee]")).toBeVisible();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(4);
+    await page.screenshot({ path: info.outputPath("gallery-marquee-selection.png") });
+    await page.mouse.up();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(4);
+    await expect(page.locator("[data-gallery-marquee]")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(mutations).toHaveLength(0);
+});
+
+test("marquee selection can start over an image, shrink to one item and cancel with Escape", async ({ page }) => {
+    const { mutations } = await gallery(page); await page.goto("/en");
+    await card(page, "gallery-a:0").getByRole("checkbox").click();
+    const first = await card(page, "gallery-a:0").boundingBox();
+    const grid = await page.locator("[data-gallery-grid]").boundingBox();
+    const start = { x: first!.x + first!.width / 2, y: first!.y + first!.height / 2 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(grid!.x + grid!.width - 2, grid!.y + grid!.height - 2, { steps: 8 });
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(4);
+    await page.mouse.move(start.x + 10, start.y + 10, { steps: 5 });
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(1);
+    await page.mouse.up();
+    await expect(card(page, "gallery-a:0").getByRole("checkbox")).toBeChecked();
+    // Escape clears selection and the rectangle even before pointerup.
+    await page.mouse.down();
+    await page.mouse.move(grid!.x + grid!.width - 2, grid!.y + grid!.height - 2, { steps: 8 });
+    await expect(page.locator("[data-gallery-marquee]")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    await expect(page.locator("[data-gallery-marquee]")).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(mutations).toHaveLength(0);
+});
+
+test("touch selection supports full-card taps and a rectangle without losing pointer capture", async ({ page, context }, info) => {
+    test.skip(info.project.name !== "mobile-chromium", "Exercises native touch events on the mobile browser.");
+    const { mutations } = await gallery(page); await page.goto("/en");
+    await card(page, "gallery-a:0").getByRole("checkbox").tap();
+    await card(page, "gallery-b:0").tap();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(2);
+    await card(page, "gallery-b:0").tap();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(1);
+    const first = await card(page, "gallery-a:0").boundingBox();
+    const grid = await page.locator("[data-gallery-grid]").boundingBox();
+    const session = await context.newCDPSession(page);
+    const start = { x: first!.x + first!.width / 2, y: first!.y + first!.height / 2 };
+    const end = { x: grid!.x + grid!.width - 2, y: grid!.y + grid!.height - 2 };
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...start, id: 1 }] });
+    for (let step = 1; step <= 8; step++) {
+        await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: start.x + (end.x - start.x) * step / 8, y: start.y + (end.y - start.y) * step / 8, id: 1 }] });
+    }
+    await expect(page.locator("[data-gallery-marquee]")).toBeVisible();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(4);
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await session.detach();
+    await expect(page.locator("[data-gallery-marquee]")).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(4);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(mutations).toHaveLength(0);
+});
+
 test("a saved order remains visible when the follow-up history refresh fails", async ({ page }) => {
     const { state, failures, mutations } = await gallery(page); await page.goto("/en");
     await expect(cards(page)).toHaveCount(4);

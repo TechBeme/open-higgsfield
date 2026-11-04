@@ -97,8 +97,12 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
     const [arrangement, setArrangement] = useState<string[] | null>(null);
     const [dragging, setDragging] = useState<string | null>(null);
     const [over, setOver] = useState<string | null>(null);
+    const [marquee, setMarquee] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
     const [announcement, setAnnouncement] = useState("");
     const lastSelected = useRef<string | null>(null);
+    const galleryGrid = useRef<HTMLDivElement | null>(null);
+    const marqueeGesture = useRef<{ pointerId: number; startX: number; startY: number; moved: boolean; initial: Set<string>; additive: boolean } | null>(null);
+    const suppressGalleryClick = useRef(false);
     const deleteOpener = useRef<HTMLElement | null>(null);
     const resultsRegion = useRef<HTMLElement | null>(null);
     const opener = useRef<HTMLElement | null>(null);
@@ -121,7 +125,7 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
     const visible = sort === "custom" ? filtered : [...filtered].sort((a, b) => (sort === "newest" ? -1 : 1) * (Date.parse(a.task.created_at) - Date.parse(b.task.created_at)) || (a.index ?? 0) - (b.index ?? 0));
     const allOutputs = visible.flatMap(item => item.preview ? [item.preview] : []);
     const selectedItems = cards.filter(item => selected.has(galleryKey(item)));
-    const selecting = selectedItems.length > 0;
+    const selecting = selectedItems.length > 0 || marquee !== null;
     const sortable = arranged.filter(canReorder);
     // Dragging always reorders, except while a date sort is shown, where a custom position would not be visible.
     const reorderable = sort === "custom" && !saving;
@@ -146,6 +150,77 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
         setSelected(current => { const next = new Set(current); for (const item of visible) { if (allSelected) next.delete(galleryKey(item)); else next.add(galleryKey(item)); } return next; });
     }
     function clearSelection() { setSelected(new Set()); lastSelected.current = null; }
+    function marqueeBox(startX: number, startY: number, currentX: number, currentY: number) {
+        return { left: Math.min(startX, currentX), top: Math.min(startY, currentY), width: Math.abs(currentX - startX), height: Math.abs(currentY - startY) };
+    }
+    function applyMarquee(box: { left: number; top: number; width: number; height: number }) {
+        const grid = galleryGrid.current;
+        const region = resultsRegion.current;
+        if (!grid || !region) return 0;
+        const rect = region.getBoundingClientRect();
+        const left = rect.left - region.scrollLeft + box.left, top = rect.top - region.scrollTop + box.top;
+        const selection = { left, top, right: left + box.width, bottom: top + box.height };
+        const keys = [...grid.querySelectorAll<HTMLElement>("[data-gallery-key]")].filter(node => {
+            const rect = node.getBoundingClientRect();
+            return rect.right > selection.left && rect.left < selection.right && rect.bottom > selection.top && rect.top < selection.bottom;
+        }).map(node => node.dataset.galleryKey).filter((key): key is string => Boolean(key));
+        const next = new Set(marqueeGesture.current?.additive ? marqueeGesture.current.initial : []);
+        for (const key of keys) next.add(key);
+        setSelected(next);
+        lastSelected.current = null;
+        return next.size;
+    }
+    function startMarquee(event: React.PointerEvent<HTMLElement>) {
+        if (!visible.length || event.button !== 0 || !event.isPrimary || marqueeGesture.current) return;
+        const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target)) return;
+        if (target.closest("[data-gallery-control], [data-submission-id], [role='menu'], [role='dialog'], [role='alertdialog'], input, select, a, button:not([data-gallery-preview])")) return;
+        // Normal image drags still reorder or attach to the prompt. Empty gallery space can always start selection.
+        if (target.closest("[data-gallery-key]") && !selecting) return;
+        if (event.pointerType === "touch" && !selecting) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        marqueeGesture.current = { pointerId: event.pointerId, startX: event.clientX - rect.left + event.currentTarget.scrollLeft, startY: event.clientY - rect.top + event.currentTarget.scrollTop, moved: false, initial: new Set(selected), additive: event.shiftKey || event.ctrlKey || event.metaKey };
+    }
+    function moveMarquee(event: React.PointerEvent<HTMLElement>) {
+        const gesture = marqueeGesture.current;
+        if (!gesture || gesture.pointerId !== event.pointerId) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const currentX = Math.max(0, Math.min(event.currentTarget.clientWidth, event.clientX - rect.left)) + event.currentTarget.scrollLeft;
+        const currentY = Math.max(0, Math.min(event.currentTarget.clientHeight, event.clientY - rect.top)) + event.currentTarget.scrollTop;
+        if (!gesture.moved && Math.hypot(currentX - gesture.startX, currentY - gesture.startY) < 5) return;
+        if (!gesture.moved) {
+            gesture.moved = true;
+            // Capturing on pointerdown retargets ordinary clicks to the region and swallows card clicks.
+            event.currentTarget.setPointerCapture(event.pointerId);
+            event.currentTarget.focus({ preventScroll: true });
+        }
+        event.preventDefault();
+        const box = marqueeBox(gesture.startX, gesture.startY, currentX, currentY);
+        setMarquee(box);
+        applyMarquee(box);
+    }
+    function finishMarquee(event: React.PointerEvent<HTMLElement>) {
+        const gesture = marqueeGesture.current;
+        if (!gesture || gesture.pointerId !== event.pointerId) return;
+        if (gesture.moved) {
+            suppressGalleryClick.current = true;
+            window.setTimeout(() => { suppressGalleryClick.current = false; }, 0);
+            const rect = event.currentTarget.getBoundingClientRect();
+            const currentX = Math.max(0, Math.min(event.currentTarget.clientWidth, event.clientX - rect.left)) + event.currentTarget.scrollLeft;
+            const currentY = Math.max(0, Math.min(event.currentTarget.clientHeight, event.clientY - rect.top)) + event.currentTarget.scrollTop;
+            setAnnouncement(t("selectedCount", { count: applyMarquee(marqueeBox(gesture.startX, gesture.startY, currentX, currentY)) }));
+        }
+        marqueeGesture.current = null;
+        setMarquee(null);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    function cancelMarquee() {
+        const gesture = marqueeGesture.current;
+        marqueeGesture.current = null;
+        setMarquee(null);
+        if (gesture?.moved) setSelected(gesture.initial);
+        if (gesture && resultsRegion.current?.hasPointerCapture(gesture.pointerId)) resultsRegion.current.releasePointerCapture(gesture.pointerId);
+    }
     function requestDelete(items: GalleryReference[]) {
         deleteOpener.current = document.activeElement as HTMLElement;
         setError(null); setDeleting(items.map(({ taskId, index }) => ({ taskId, index })));
@@ -240,10 +315,12 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
     </div>;
     const toolbar = hasContent && (selecting ? selectionTools : browseTools);
 
-    return <section ref={resultsRegion} tabIndex={-1} aria-label={t("feedTitle")} className="relative h-full overflow-y-auto overscroll-contain outline-none" onKeyDown={event => {
+    return <section ref={resultsRegion} tabIndex={-1} aria-label={t("feedTitle")} className={`relative h-full overflow-y-auto overscroll-contain outline-none select-none ${selecting ? "touch-none" : ""}`} onPointerDown={startMarquee} onPointerMove={moveMarquee} onPointerUp={finishMarquee} onPointerCancel={cancelMarquee} onLostPointerCapture={event => { if (event.target === event.currentTarget) cancelMarquee(); }} onClickCapture={event => {
+        if (suppressGalleryClick.current) { event.preventDefault(); event.stopPropagation(); suppressGalleryClick.current = false; }
+    }} onKeyDown={event => {
         if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target as HTMLElement).closest('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); selectVisible(); }
-        if (event.key === "Escape" && !busy) clearSelection();
+        if (event.key === "Escape" && !busy) { cancelMarquee(); clearSelection(); }
     }}>
         <HeaderToolbar>{toolbar}</HeaderToolbar>
         <h1 className="sr-only">{t("feedTitle")}</h1>
@@ -251,7 +328,7 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
         {history.isLoading && <p role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{t("loadingHistory")}</p>}
         {history.error && <div role="alert" className="mx-auto max-w-2xl p-6 text-center text-sm text-destructive"><p>{t("historyError")}</p><Button type="button" variant="outline" className="mt-4" onClick={() => void history.mutate().catch(() => undefined)}>{t("retryHistory")}</Button></div>}
         {error && !deleting && <p role="alert" className="px-3 pt-2 text-xs text-destructive">{errors.has(error) ? errors(error) : t("orderError")}</p>}
-        {!hasContent && !history.isLoading && !history.error ? empty : hasContent && <div data-gallery-grid style={{ "--row-size": `${rowSize}px` } as React.CSSProperties} className="flex flex-wrap gap-1 p-1 [--row:calc(var(--row-size)*0.6)] sm:gap-1.5 sm:p-1.5 sm:[--row:var(--row-size)]">
+        {!hasContent && !history.isLoading && !history.error ? empty : hasContent && <div ref={galleryGrid} data-gallery-grid style={{ "--row-size": `${rowSize}px` } as React.CSSProperties} className="flex flex-wrap gap-1 p-1 [--row:calc(var(--row-size)*0.6)] sm:gap-1.5 sm:p-1.5 sm:[--row:var(--row-size)]">
             {localSubmissions.map(item => <SubmissionTile key={item.id} submission={item} ratio={mode === "video" ? 16 / 9 : 1} />)}
             {visible.map(item => {
                 const key = galleryKey(item), position = sortable.findIndex(candidate => galleryKey(candidate) === key);
@@ -279,6 +356,7 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
             <div aria-hidden="true" className="h-0 basis-0" style={{ flexGrow: 1e6 }} />
             {!visible.length && cards.length > 0 && <p role="status" className="w-full py-16 text-center text-sm text-muted-foreground">{t("noMatches")}</p>}
         </div>}
+        {marquee && <div data-gallery-marquee aria-hidden="true" className="pointer-events-none absolute z-10 rounded-sm border border-primary bg-primary/15" style={marquee} />}
         {history.hasMore && <div className="flex justify-center p-5"><Button type="button" variant="outline" disabled={history.isLoadingMore || Boolean(history.error)} onClick={() => void history.loadMore()}>{history.isLoadingMore && <Loader2 className="animate-spin" />}{t(history.isLoadingMore ? "loadingHistory" : "loadMore")}</Button></div>}
         <ConfirmDialog returnFocus={deleteOpener} open={Boolean(deleting)} onClose={() => { if (!busy) { setDeleting(null); setError(null); } }} onConfirm={() => void remove()} busy={busy} title={deleting?.length === 1 ? t("deleteTitle") : t("deleteManyTitle", { count: deleting?.length ?? 0 })} description={t("deleteAssetsHint")} error={error && deleting ? mutationError(error) : undefined} confirmLabel={t("deleteConfirm")} cancelLabel={t("cancel")} />
         {preview && preview.index >= 0 && <Lightbox items={preview.items} index={preview.index} returnFocus={opener} actions={{
@@ -330,11 +408,16 @@ function GalleryTile({ item, selected, selecting, dragging, over, canMoveBefore,
     const showActions = !selecting;
     const draggable = !selecting && (Boolean(preview) || canMoveBefore || canMoveAfter);
 
-    return <article data-gallery-key={galleryKey(item)} aria-label={name} draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={onOver} onDragLeave={onLeave} onDrop={onDrop} style={tileStyle(ratio)}
+    return <article data-gallery-key={galleryKey(item)} aria-label={name} draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={onOver} onDragLeave={onLeave} onDrop={onDrop} onClick={event => {
+        if (!selecting || event.defaultPrevented) return;
+        const target = event.target as HTMLElement;
+        if (target.closest("[data-gallery-control], [role='menu'], [role='dialog'], a, button")) return;
+        onSelect(event.shiftKey);
+    }} style={tileStyle(ratio)}
         onMouseEnter={() => { if (!selecting) void video.current?.play().catch(() => undefined); }}
         onMouseLeave={() => { if (video.current) { video.current.pause(); video.current.currentTime = 0; } }}
         className={`group/tile @container relative min-w-0 overflow-hidden rounded-lg bg-white/[.04] transition-[opacity,box-shadow] ${selected || over ? "outline-2 -outline-offset-2 outline-primary" : ""} ${dragging ? "opacity-40" : ""}`}>
-        {preview ? <button type="button" aria-label={`${t("preview")} - ${name}`} title={selecting ? undefined : t("dragImageHint")} onClick={event => { if (selecting || event.shiftKey || event.ctrlKey || event.metaKey) onSelect(event.shiftKey); else onPreview(); }}
+        {preview ? <button type="button" data-gallery-preview aria-label={selecting ? t("selectItem", { name }) : `${t("preview")} - ${name}`} title={selecting ? undefined : t("dragImageHint")} onClick={event => { event.stopPropagation(); if (selecting || event.shiftKey || event.ctrlKey || event.metaKey) onSelect(event.shiftKey); else onPreview(); }}
             className={`absolute inset-0 block size-full overflow-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${selecting ? "cursor-pointer" : "cursor-zoom-in"}`}>
             {preview.mediaType === "video"
                 ? <video ref={video} src={preview.url} muted loop playsInline preload="metadata" onLoadedMetadata={event => measured(event.currentTarget.videoWidth, event.currentTarget.videoHeight)} className={`size-full object-cover transition-transform duration-200 ${selected ? "scale-[.94] rounded-md" : ""}`} />
@@ -350,12 +433,12 @@ function GalleryTile({ item, selected, selecting, dragging, over, canMoveBefore,
         <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent [@media(hover:none)]:h-14 [@media(hover:none)]:from-black/35 ${selecting && !selected ? "opacity-100" : revealOnHover}`} />
         {preview && onSendImage && showActions && <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent ${revealOnHover} ${desktopOnly}`} />}
 
-        <button type="button" role="checkbox" aria-checked={selected} aria-label={t("selectItem", { name })} onClick={event => onSelect(event.shiftKey)}
+        <button type="button" data-gallery-control="checkbox" role="checkbox" aria-checked={selected} aria-label={t("selectItem", { name })} onClick={event => { event.stopPropagation(); onSelect(event.shiftKey); }}
             className={`absolute left-2 top-2 z-[1] grid size-6 place-items-center rounded-full border-2 shadow transition-[opacity,background-color] focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary ${selected ? "border-primary bg-primary text-primary-foreground" : `border-white/80 bg-black/25 text-transparent hover:bg-black/50 ${selecting ? "opacity-100" : revealOnHover}`}`}>
             <Check strokeWidth={3} className="size-3.5" />
         </button>
 
-        {showActions && <div className={`absolute right-2 top-2 z-[1] flex flex-col gap-1.5 ${revealOnHover}`}>
+        {showActions && <div data-gallery-control="actions" onClick={event => event.stopPropagation()} className={`absolute right-2 top-2 z-[1] flex flex-col gap-1.5 ${revealOnHover}`}>
             {preview && <Hint label={t(preview.mediaType === "video" ? "downloadVideo" : "downloadImage")}><a href={preview.downloadUrl} download aria-label={t(preview.mediaType === "video" ? "downloadVideo" : "downloadImage")} className={`${roundAction} ${desktopOnly}`}><Download className="size-4" /></a></Hint>}
             {onReusePrompt && <Hint label={t("reusePrompt")}><button type="button" aria-label={t("reusePrompt")} onClick={onReusePrompt} className={`${roundAction} ${desktopOnly}`}><Copy className="size-4" /></button></Hint>}
             <Hint label={t("delete")}><button type="button" aria-label={t("delete")} onClick={onDelete} className={`${roundAction} ${desktopOnly}`}><Trash2 className="size-4" /></button></Hint>
@@ -380,7 +463,7 @@ function GalleryTile({ item, selected, selecting, dragging, over, canMoveBefore,
             </DropdownMenu>
         </div>}
 
-        {preview && onSendImage && showActions && <div className={`absolute inset-x-2 bottom-2 z-[1] hidden items-center justify-end gap-1.5 @min-[230px]:flex [@media(hover:none)]:hidden! ${revealOnHover}`}>
+        {preview && onSendImage && showActions && <div data-gallery-control="send-image" onClick={event => event.stopPropagation()} className={`absolute inset-x-2 bottom-2 z-[1] hidden items-center justify-end gap-1.5 @min-[230px]:flex [@media(hover:none)]:hidden! ${revealOnHover}`}>
             <button type="button" onClick={() => onSendImage("reference")} className="flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white backdrop-blur-md hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary"><ImagePlus className="size-3.5" />{t("reference")}</button>
             <DropdownMenu>
                 <DropdownMenuTrigger className="flex h-8 items-center gap-1.5 rounded-full bg-black/55 pl-3 pr-2 text-xs font-semibold text-white backdrop-blur-md hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary"><Clapperboard className="size-3.5" />{t("animate")}<ChevronDown className="size-3.5 opacity-70" /></DropdownMenuTrigger>
