@@ -1,8 +1,9 @@
 # Deployment
 
-Follow the [production operator guide](production.md) before starting production.
-It requires a single-operator credential, HTTPS, an explicit storage/execution
-profile and deliberate generation enablement.
+Follow the [production guide](production.md) before starting production.
+The app has no built-in login. It requires HTTPS, an explicit storage/execution
+profile and deliberate generation enablement. Public read-only demos use
+`APP_DEMO_MODE=true` and `GENERATION_ENABLED=false`.
 
 - **Persistent Node/Docker:** one process with a mounted data volume and startup
   worker recovery. Keep the HTTP application port behind an HTTPS reverse proxy.
@@ -10,11 +11,11 @@ profile and deliberate generation enablement.
   and Vercel Workflows for durable background execution. No recurring Cron is
   required. Workflows, Functions, Queues and storage have separate usage limits.
 
-Every authenticated person shares all tasks and provider spending authority.
+Everyone with access to the deployment URL shares its tasks, settings and provider spending authority outside demo mode.
 There are no multi-user ownership boundaries, application monetary caps or global
 rate limits. Configure provider quotas and ingress controls before enabling work.
 Blob/S3 originals default to private with signed links; legacy Cloudinary
-originals remain public by URL even with application authentication.
+originals remain public by URL.
 
 See [storage](storage.md) for media/legacy compatibility and
 [production](production.md) for environment settings, HTTPS, migration, Workflow execution,
@@ -38,7 +39,7 @@ deployment before enabling paid generation.
    unreadable. Local `.env.local` files, downloaded media and local provider
    configuration are ignored by Git and are not transferred to Vercel.
 3. For an older installation that has not adopted the production storage profile,
-   back up first and follow the [operator guide](production.md). The schema needs
+   back up first and follow the [production guide](production.md). The schema needs
    `migrations/0001_durable_task_lifecycle.sql`,
    `migrations/0002_provider_runtime_catalog.sql` and
    `migrations/0003_workflow_queue.sql`, in that order. Review/apply missing migrations
@@ -46,12 +47,12 @@ deployment before enabling paid generation.
 4. Enable Fluid compute and access to System Environment Variables in the Vercel
    project settings. Confirm `VERCEL_DEPLOYMENT_ID` is available at runtime. Set
    `TASK_WORKER_MODE=workflow`; no Cron or scheduler secret is needed. After
-   switching, use the authenticated recovery endpoint described in
+   switching, use the recovery endpoint described in
    [background execution](background-execution.md) for previously accepted tasks.
 5. Environment-variable changes take effect in a **new deployment**. Redeploy
    after changing them; editing a variable does not update an existing deployment.
 6. Verify the new deployment: public `/api/health` returns `{"status":"alive"}`;
-   authenticated `/api/ready` returns `ready: true`; Providers and Studio load in
+   `/api/ready` returns `ready: true`; Providers and Studio load in
    `en`, `pt-BR` and `es`; saved connections, gallery downloads, image selection,
    and mobile controls work. `/api/ready` does not prove Workflow delivery or
    that a provider can generate. Check a synthetic Workflow execution separately. An actual
@@ -62,7 +63,7 @@ Required server-side settings for the supported Vercel profile:
 | Setting | Expected value |
 | --- | --- |
 | `APP_ORIGIN` | Exact public HTTPS origin, without trailing slash or path |
-| `APP_ACCESS_USER`, `APP_ACCESS_PASSWORD` | Existing operator credential; password must meet the [operator guide](production.md) requirements |
+| `APP_DEMO_MODE` | `true` for a public read-only demo, otherwise `false` |
 | `PROVIDER_CONFIG_ENCRYPTION_KEY` | Stable secret for saved provider connections |
 | `DEPLOYMENT_PROFILE`, `TASK_WORKER_MODE` | `distributed`, `workflow` |
 | `DATABASE_URL` | Migrated PostgreSQL/Neon database |
@@ -73,7 +74,7 @@ Required server-side settings for the supported Vercel profile:
 
 Configure provider credentials through **Providers** or server environment
 variables, such as `RUNWARE_API_KEY`. Keep Preview environments isolated from
-production credentials, task data and spending authority. See the operator guide
+production credentials, task data and spending authority. See the production guide
 for HTTPS origins and preview/deployment-protection considerations.
 
 Official Vercel references (checked November 4, 2026):

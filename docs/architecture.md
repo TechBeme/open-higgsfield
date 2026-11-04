@@ -145,7 +145,7 @@ integration tests require an explicitly configured disposable test database and
 
 Install the test browsers with `npx playwright install --with-deps chromium firefox webkit`
 before running `npm run build` and `npm run test:e2e`. Node 22 and OpenSSL must be available. The suite
-starts its own authenticated HTTPS workspace on loopback ports 3110 and 3111;
+starts its own HTTPS workspace without login on loopback ports 3110 and 3111;
 those ports must be free. It uses temporary storage, synthetic credentials and
 disabled generation, and removes its data on exit. Local provider keys, history
 and database settings are overridden for this process. Do not point these tests
@@ -156,7 +156,7 @@ recommendation; rebuild after source changes. `npm run check` and CI build befor
 running the suite. For development diagnostics, use
 `E2E_PRODUCTION=0 npm run test:e2e`, which uses a separate `.next-e2e` directory.
 Chromium, Firefox, WebKit and mobile Chromium cover
-English, Portuguese and Spanish, hydration/F5, provider connections, authenticated
+English, Portuguese and Spanish, hydration/F5, provider connections, public
 logos, model selection, attachment limits, failed-request recovery, task history,
 keyboard focus and automated accessibility checks. External generation and uploads
 are mocked. Reports and failure traces stay in ignored `playwright-report/` and

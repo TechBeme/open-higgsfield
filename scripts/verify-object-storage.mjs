@@ -191,26 +191,24 @@ test("remote reference inputs use stable app URLs and fresh provider URLs withou
     }
 });
 
-test("actual media routes authenticate before reading tasks or issuing private links", async () => {
-    const env = { ...blobEnv, NODE_ENV: "production", APP_ORIGIN: "https://studio.example.com",
-        APP_ACCESS_USER: "synthetic", APP_ACCESS_PASSWORD: "synthetic-test-password-32-characters" };
+test("media routes serve scoped private links without a workspace login", async () => {
+    const env = { ...blobEnv, NODE_ENV: "production", APP_ORIGIN: "https://studio.example.com" };
     let reads = 0;
     const task = fixture();
     const h = harness(env, { mocks: { "@/server/tasks/store": { initStore: async () => {}, getTask: async () => { reads++; return task; } } } });
     await h.assets.attachGeneratedAssets(task, [{ data: png }]);
     const route = h.loader.load("src/app/api/download/[taskId]/route.ts");
     const uploadRoute = h.loader.load("src/app/api/uploaded/[filename]/route.ts");
-    const request = authorized => {
-        const value = new Request("https://studio.example.com/api/download/synthetic?index=0", {
-            headers: authorized ? { Authorization: `Basic ${Buffer.from(`${env.APP_ACCESS_USER}:${env.APP_ACCESS_PASSWORD}`).toString("base64")}` } : {},
-        });
-        value.nextUrl = new URL(value.url); return value;
-    };
-    assert.equal((await route.GET(request(false), { params: Promise.resolve({ taskId: "synthetic" }) })).status, 401);
-    assert.equal((await uploadRoute.GET(request(false), { params: Promise.resolve({ filename: `${digest(png)}.png` }) })).status, 401);
-    assert.equal(reads, 0); assert.equal(h.calls.issue.length, 0);
-    assert.equal((await route.GET(request(true), { params: Promise.resolve({ taskId: "synthetic" }) })).status, 307);
+    const request = new Request("https://studio.example.com/api/download/synthetic?index=0");
+    request.nextUrl = new URL(request.url);
+    const download = await route.GET(request, { params: Promise.resolve({ taskId: "synthetic" }) });
+    assert.equal(download.status, 307);
+    assert.equal(download.headers.get("www-authenticate"), null);
     assert.equal(reads, 1); assert.equal(h.calls.issue.length, 1);
+    const uploaded = await uploadRoute.GET(request, { params: Promise.resolve({ filename: `${digest(png)}.png` }) });
+    assert.equal(uploaded.status, 307);
+    assert.equal(uploaded.headers.get("www-authenticate"), null);
+    assert.equal(h.calls.issue.length, 2);
 });
 
 test("public delivery requires explicit configuration and downloads keep native flags", async () => {

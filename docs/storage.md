@@ -67,7 +67,7 @@ Compatibility depends on conditional PUT, HEAD and SigV4 support.
 
 Output records contain stable references, not signed URLs. Browser-facing DTOs
 retain `/api/download/...` URLs; inputs retain `/api/uploaded/...` URLs. After app
-authentication, these routes redirect to a fresh signed object URL, valid for
+request validation, these routes redirect to a fresh signed object URL, valid for
 15 minutes. Downloads use the storage provider's native attachment option.
 Reusing media in a generation creates a fresh 24-hour provider link. These links
 are bearer credentials: anyone receiving one can read that exact file until it

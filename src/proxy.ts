@@ -17,6 +17,6 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-    // SDK handlers validate the queue's own delivery credentials, not HTTP Basic.
+    // SDK handlers validate the queue's own delivery credentials.
     matcher: ["/((?!_next/static/|_next/webpack-hmr$|\\.well-known/workflow/).*)"],
 };

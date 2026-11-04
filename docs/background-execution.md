@@ -64,7 +64,7 @@ rejects local/non-Vercel Workflow targets. For local development only,
 
 `withWorkflow` wraps the Next configuration. Generated
 `/.well-known/workflow/*` handlers use the Workflow queue protocol and bypass
-workspace HTTP Basic, as required by the SDK. They are not workspace API routes.
+workspace request policies, as required by the SDK. They validate their own delivery credentials.
 Generated sources and `.workflow-data/` are ignored by Git. Do not apply a blanket
 Basic-auth middleware to these handlers. Verify platform delivery when using
 Deployment Protection.
