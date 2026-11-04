@@ -158,8 +158,6 @@
     "dismissSubmission": "Dismiss this request notice",
     "dragImageHint": "Click to enlarge · Drag onto another image to reorder or onto the prompt to reuse",
     "loadedCount": "{count, plural, one {# item loaded} other {# items loaded}}",
-    "comfortableGrid": "Larger previews",
-    "compactGrid": "Compact grid",
     "searchGallery": "Search loaded creations",
     "filterGallery": "Filter creations",
     "sortGallery": "Sort creations",
@@ -207,7 +205,11 @@
     "densityLabel": "Preview size",
     "clearSearch": "Clear search",
     "moveBefore": "Move earlier",
-    "moveAfter": "Move later"
+    "moveAfter": "Move later",
+    "copyPrompt": "Copy prompt",
+    "promptCopied": "Prompt copied",
+    "copyFailed": "Could not copy",
+    "previewActions": "Image actions"
   },
   "errors": {
     "ERR_NO_API_KEY": "Connect an account in Providers before generating.",
