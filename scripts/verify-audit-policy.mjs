@@ -8,19 +8,18 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
 const paths = {
-  "node_modules/minimatch": { version: "3.1.5", dev: true },
   "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch": { version: "10.2.4", dev: true },
   "node_modules/eslint": { version: "9.0.0", dev: true },
   "node_modules/@eslint-community/eslint-utils": { version: "4.0.0", dev: true },
 };
 const counts = (total, moderate = total) => ({ info: 0, low: 0, moderate, high: 0, critical: 0, total });
-const advisory = () => ({ source: 1244012, name: "minimatch", dependency: "minimatch", url: "https://github.com/advisories/GHSA-g3hv-75wg-m249", severity: "moderate", range: "<11.0.1" });
+const advisory = () => ({ source: 1244623, name: "minimatch", dependency: "minimatch", url: "https://github.com/advisories/GHSA-g3hv-75wg-m249", severity: "moderate", range: ">=7.0.0 <11.0.1" });
 const reviewOptions = { lockPackages: paths, now: "2026-11-01T00:00:00Z" };
 function report(entries = {}, metadata = counts(Object.keys(entries).length)) {
   return { auditReportVersion: 2, vulnerabilities: entries, metadata: { vulnerabilities: metadata } };
 }
 function minimatch() {
-  return { name: "minimatch", severity: "moderate", range: "<11.0.1", nodes: Object.keys(paths).slice(0, 2), via: [advisory()] };
+  return { name: "minimatch", severity: "moderate", range: ">=7.0.0 <11.0.1", nodes: ["node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch"], via: [advisory()] };
 }
 function graph() {
   return {
@@ -48,7 +47,7 @@ test("new advisory, high severity, production node and unrooted cycle fail close
   const extra = { name: "unknown", severity: "low", range: "*", nodes: ["node_modules/eslint"], via: [] };
   assert.match(validateAuditReport(report({ ...base, unknown: extra }, { info: 0, low: 1, moderate: 3, high: 0, critical: 0, total: 4 }), reviewOptions).reason, /lockfile|missing vulnerability edge|unrooted/);
   assert.match(validateAuditReport(report({ ...base, eslint: { ...base.eslint, severity: "high" }, }, { info: 0, low: 0, moderate: 2, high: 1, critical: 0, total: 3 }), reviewOptions).reason, /high/);
-  const productionLock = { ...paths, "node_modules/minimatch": { version: "3.1.5", dev: false } };
+  const productionLock = { ...paths, "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch": { version: "10.2.4", dev: false } };
   assert.match(validateAuditReport(report(base, counts(3)), { ...reviewOptions, lockPackages: productionLock }).reason, /production/);
   const cycle = { eslint: { ...base.eslint, via: ["@eslint-community/eslint-utils"] }, "@eslint-community/eslint-utils": { ...base["@eslint-community/eslint-utils"], via: ["eslint"] } };
   assert.match(validateAuditReport(report(cycle, counts(2, 2)), reviewOptions).reason, /accepted minimatch/);
@@ -97,10 +96,10 @@ test("every accepted advisory identity field and reviewed copy is enforced", () 
     const changed = { ...base, minimatch: { ...base.minimatch, via: [{ ...advisory(), ...change }] } };
     assert.match(validateAuditReport(report(changed, counts(3)), reviewOptions).reason, /unaccepted/);
   }
-  const changedVersion = { ...paths, "node_modules/minimatch": { version: "3.1.6", dev: true } };
+  const changedVersion = { ...paths, "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch": { version: "10.2.5", dev: true } };
   assert.match(validateAuditReport(report(base, counts(3)), { ...reviewOptions, lockPackages: changedVersion }).reason, /unreviewed/);
   const missingCopy = { ...base, minimatch: { ...base.minimatch, nodes: ["node_modules/minimatch"] } };
-  assert.match(validateAuditReport(report(missingCopy, counts(3)), reviewOptions).reason, /node set/);
+  assert.match(validateAuditReport(report(missingCopy, counts(3)), reviewOptions).reason, /lockfile node is missing/);
 });
 
 test("new advisory on an otherwise valid dev node and detached cycles fail", () => {
@@ -114,4 +113,17 @@ test("new advisory on an otherwise valid dev node and detached cycles fail", () 
   };
   const withNodes = { ...paths, "node_modules/a": { version: "1", dev: true }, "node_modules/b": { version: "1", dev: true } };
   assert.match(validateAuditReport(report(detached, counts(5)), { ...reviewOptions, lockPackages: withNodes }).reason, /unrooted/);
+});
+
+
+test("superseded wider advisory and legacy copy remain rejected", () => {
+  const base = graph();
+  for (const change of [{ source: 1244012 }, { range: "<11.0.1" }]) {
+    const changed = { ...base, minimatch: { ...base.minimatch, via: [{ ...advisory(), ...change }] } };
+    assert.match(validateAuditReport(report(changed, counts(3)), reviewOptions).reason, /unaccepted/);
+  }
+  const legacy = "node_modules/minimatch";
+  const changed = { ...base, minimatch: { ...base.minimatch, nodes: [legacy] } };
+  assert.match(validateAuditReport(report(changed, counts(3)), { ...reviewOptions,
+    lockPackages: { ...paths, [legacy]: { version: "3.1.5", dev: true } } }).reason, /unreviewed/);
 });

@@ -66,7 +66,7 @@ CI runs `npm run audit:dependencies`, which executes both a production audit and
 an all-dependency audit with JSON output. The production graph must have no
 advisories. The full graph must have no high or critical advisories; the only
 temporary exception is the exact `GHSA-g3hv-75wg-m249` minimatch advisory on the
-two reviewed development-only copies, through 2026-11-30 UTC. The gate validates
+reviewed development-only copy, through 2026-11-30 UTC. The gate validates
 the npm report schema, lockfile paths and versions, development scope, advisory
 graph, and expiry. Any new advisory, production copy, malformed report, audit
 service failure, or expired exception fails closed. An npm exit code of 1 is
@@ -90,7 +90,7 @@ Independent QA accepted the following development-tooling exception on 2026-10-3
 | Item | Accepted boundary |
 | --- | --- |
 | Advisory | [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), minimatch glob-pattern amplification |
-| Installed copies | `node_modules/minimatch` 3.1.5 and `node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch` 10.2.4 |
+| Installed copy | `node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch` 10.2.4 |
 | Scope | Development-only lint/TypeScript tooling; audit also reports affected consumers as metapackages |
 | Compatibility limit | The fixed 11.0.1 release changes the contract used by legacy minimatch consumers; forcing it or downgrading ESLint is not an approved remediation |
 | Boundaries | Repository-controlled lint configuration, read-only CI permissions, 25-minute job timeout; no application endpoint accepting glob patterns was found |
@@ -99,8 +99,9 @@ Independent QA accepted the following development-tooling exception on 2026-10-3
 
 This exception does not cover a new advisory, a production dependency, or a new
 application use of minimatch. Keep audit findings visible. The advisory describes
-`optimizationLevel >= 2`; its published affected range is retained as reported,
-without claiming every installed consumer is demonstrably exploitable.
+`optimizationLevel >= 2`; its current published affected range is
+`>=7.0.0 <11.0.1`. The older `minimatch` 3.x copy is outside that range and is
+not accepted as part of this exception.
 
 The committed manifest and lockfile record the selected versions. Re-run the
 checks above before release; the dated exception is not a current audit result.
@@ -132,8 +133,16 @@ minimatch pins. The committed overrides select the existing direct Zod 4.6.7,
 Undici 7.30.1 for the vulnerable 7.30.0 copies, and minimatch 11.0.1 for
 `@vercel/queue`, `@oclif/core`, `@swc/cli` and `filelist`. These consumers were
 reviewed against their actual named `minimatch()` / `match()` APIs; regression
-tests exercise the resolved copies. Unlike the two legacy development copies
+tests exercise the resolved copies. Unlike the legacy development copy
 above, these SDK consumers support the corrected contract. This adds no audit
 exception. Revisit overrides when upstream dependencies adopt fixed versions.
 Clean install, production build, SDK runtime smoke, regressions and both audit
 gates must pass; do not run concurrent npm mutations on one dependency tree.
+
+## Advisory metadata refresh (2026-11-04)
+
+The official GitHub advisory was updated at 16:50 UTC to narrow the affected
+range to `>=7.0.0 <11.0.1`; npm now identifies it as source 1244623. The exact
+audit gate follows that revised identity and only the reviewed TypeScript
+tooling copy 10.2.4. It rejects the superseded wider range, old source ID and
+legacy 3.x node. The existing expiry and development-only limits are unchanged.
