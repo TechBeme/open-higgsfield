@@ -38,7 +38,9 @@ function httpsOrigin(value: string): string {
 
 export function blobConfiguration() {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    const oidcAvailable = Boolean(process.env.VERCEL_OIDC_TOKEN);
+    // Vercel can supply OIDC through the request context rather than process.env;
+    // startup runs before a request exists. Let the SDK resolve it at call time.
+    const oidcAvailable = Boolean(process.env.VERCEL_OIDC_TOKEN || (process.env.VERCEL && process.env.BLOB_STORE_ID));
     // Vercel's recommended deployment path uses the short-lived OIDC token
     // paired with BLOB_STORE_ID. A static read-write token remains supported
     // for local development and non-Vercel hosts.

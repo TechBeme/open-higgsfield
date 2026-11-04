@@ -62,7 +62,7 @@ function harness(env = blobEnv, options = {}) {
 }
 
 test("Blob/S3 production configuration is explicit, private by default and validated before work", () => {
-    for (const env of [blobEnv, blobOidcEnv, s3Env]) assert.equal(harness(env).assets.assertGeneratedStorageConfigured(), env.ASSET_STORAGE_MODE);
+    for (const env of [blobEnv, blobOidcEnv, { ...blobOidcEnv, VERCEL_OIDC_TOKEN: undefined }, s3Env]) assert.equal(harness(env).assets.assertGeneratedStorageConfigured(), env.ASSET_STORAGE_MODE);
     assert.equal(harness({ ...blobEnv, BLOB_STORE_ID: "store_Synthetic123" }).storage.blobConfiguration().storeId, "synthetic123");
     for (const env of [
         { ASSET_STORAGE_MODE: "vercel-blob" }, { ...blobEnv, ASSET_DELIVERY_MODE: "invalid" },
