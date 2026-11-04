@@ -63,15 +63,23 @@ Cada proveedor tiene sus propias conexiones, prioridades y ajustes de visibilida
 | --- | --- |
 | ![Conexiones de Google AI Studio y visibilidad de modelos](docs/images/open-higgsfield-provider-detail-es.png) | ![Selector de modelos del Estudio en español](docs/images/open-higgsfield-models-es.png) |
 
+### Galería y selección
+
+Busca y filtra tus creaciones, ajusta el tamaño de las miniaturas, amplía una vista previa, reutiliza un prompt o envía una imagen al compositor. Arrastra imágenes para reordenarlas o utiliza el menú de cada tarjeta en pantallas táctiles.
+
+Después de seleccionar un elemento, haz clic en cualquier parte de otra imagen para seleccionarla o deseleccionarla. Arrastra desde el espacio vacío de la galería para dibujar un rectángulo de selección; con la selección activa, el gesto también puede empezar sobre una imagen. Shift/Ctrl/Cmd conserva la selección anterior durante el arrastre y Escape la borra. Descarga o elimina varios elementos a la vez.
+
+![Galería con varias imágenes seleccionadas en español](docs/images/open-higgsfield-gallery-selection-es.png)
+
 ### Estudio en escritorio y móvil
 
-El mismo espacio permite generar imágenes y videos, con controles derivados de las capacidades de cada modelo. Antes de conectar un proveedor, la generación permanece desactivada y la acción de configuración está visible.
+El compositor reúne el modo imagen/video, la selección de modelo, los archivos de referencia y los ajustes de cada modelo. En el móvil, el selector de modo aparece encima del compositor. La generación se ejecuta en segundo plano para que puedas iniciar otra creación mientras terminan las anteriores. Sin un proveedor conectado y un modelo habilitado, la generación permanece desactivada.
 
 <p align="center">
   <img src="docs/images/open-higgsfield-studio-mobile-es.png" alt="Estudio de Open-Higgsfield en móvil en español" width="320" />
 </p>
 
-Capturas realizadas con Playwright sobre el build de producción en un espacio aislado. Las conexiones y el prompt son datos de demostración; no se usaron claves reales, medios privados ni generaciones de pago.
+Capturas realizadas con Playwright sobre el build de producción en un espacio aislado. Las conexiones, los prompts y las ilustraciones costeras son datos de demostración, no resultados reales de los proveedores. No se usaron claves reales, medios privados ni generaciones de pago.
 
 ## Proveedores compatibles
 
@@ -86,7 +94,7 @@ Conecta un proveedor desde **Proveedores** o configura sus credenciales mediante
 | ToAPIs | 51 | 51 | `TOAPIS_API_KEY` |
 | Runware | 191 | 110 | `RUNWARE_API_KEY` |
 
-Recuentos verificados en `/api/catalog` el 3 de noviembre de 2026. Las entradas incluyen variantes de uso, no solo modelos distintos del proveedor. Solo los modelos habilitados de proveedores conectados aparecen en el Estudio.
+Recuentos verificados en `/api/catalog` el 4 de noviembre de 2026. Las entradas incluyen variantes de uso, no solo modelos distintos del proveedor. Solo los modelos habilitados de proveedores conectados aparecen en el Estudio.
 
 El catálogo incluye Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image y OmniHuman. La disponibilidad, los precios, las cuotas y el acceso preview dependen de cada proveedor.
 
@@ -103,7 +111,9 @@ Consulta [Proveedores y modelos](docs/providers.md) para credenciales e instrucc
 - Audio nativo y múltiples escenas cuando están disponibles
 - Entradas mediante arrastrar y soltar, pegar, subir archivos y URL pública
 - Tareas síncronas y asíncronas normalizadas
-- Progreso en vivo, reutilización de prompts, vista previa y descargas
+- Generación en segundo plano con progreso en vivo y errores individuales por tarea
+- Vistas previas con zoom, reutilización de prompts, referencias de imagen y descargas
+- Galería con búsqueda, miniaturas ajustables, orden persistente, selección desde toda la tarjeta, selección rectangular y acciones en lote
 - Interfaz adaptable para escritorio y móvil
 - Interfaz en inglés, portugués brasileño y español, con selector de idioma persistente
 - Varias conexiones cifradas por proveedor, prioridades, control de modelos visibles y descubrimiento de modelos cuando esté disponible
@@ -237,6 +247,8 @@ Producción requiere una credencial del operador, origen HTTPS, PostgreSQL migra
 Es un espacio compartido: quien tiene la credencial accede a todas las tareas y utiliza las mismas cuentas de proveedores. No hay aislamiento por usuario, presupuesto monetario ni límite global de solicitudes en la aplicación. Configura cuotas de proveedores y protección de entrada. Los archivos de Cloudinary siguen siendo públicos por URL.
 
 Sigue la [guía de operación](docs/production.md) antes de iniciar Docker o publicar en Vercel; describe configuración, migración, HTTPS, programación y recuperación.
+
+Para actualizar un despliegue existente, consulta el [checklist de Vercel](docs/deployment.md#updating-an-existing-vercel-deployment): integración Git, variables, migraciones y verificación. Estos cambios de galería y diseño móvil no requieren variables de entorno nuevas ni migraciones de base de datos.
 
 ## Comandos
 

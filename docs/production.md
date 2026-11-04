@@ -182,7 +182,9 @@ Use platform ingress controls against credential guessing and availability abuse
 1. Back up task/media data and stop every old web/worker writer; old writers
    ignore revisions/tombstones. Keep generation disabled.
 2. After separate production authorization, apply
-   `migrations/0001_durable_task_lifecycle.sql` with `psql -X -v ON_ERROR_STOP=1`.
+   `migrations/0001_durable_task_lifecycle.sql` and
+   `migrations/0002_provider_runtime_catalog.sql`, in that order, with
+   `psql -X -v ON_ERROR_STOP=1`.
    Supply the connection through a restricted PostgreSQL service/env file;
    never print it. Legacy file history is normalized by the new reader. Do not
    bulk-upload old media during startup.

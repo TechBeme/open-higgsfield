@@ -63,15 +63,23 @@ Cada provedor tem suas próprias conexões, prioridades e configurações de vis
 | --- | --- |
 | ![Conexões do Google AI Studio e visibilidade dos modelos](docs/images/open-higgsfield-provider-detail-pt-br.png) | ![Seletor de modelos do Estúdio em português](docs/images/open-higgsfield-models-pt-br.png) |
 
+### Galeria e seleção
+
+Busque e filtre suas criações, ajuste o tamanho das miniaturas, amplie um preview, reutilize um prompt ou envie uma imagem de volta ao compositor. Arraste imagens para reordená-las ou use o menu do card em telas de toque.
+
+Depois de selecionar um item, clique em qualquer parte de outra imagem para selecionar ou desselecionar. Arraste no espaço vazio da galeria para desenhar um retângulo de seleção; com a seleção ativa, o gesto também pode começar sobre uma imagem. Shift/Ctrl/Cmd preserva a seleção anterior durante o arraste, e Escape limpa a seleção. Baixe ou exclua vários itens de uma vez.
+
+![Galeria com várias imagens selecionadas em português](docs/images/open-higgsfield-gallery-selection-pt-br.png)
+
 ### Estúdio no desktop e no celular
 
-O mesmo workspace permite gerar imagens e vídeos, com controles derivados das capacidades de cada modelo. Antes de conectar um provedor, a geração fica desabilitada e a ação de configuração fica visível.
+O compositor reúne o modo imagem/vídeo, a seleção de modelo, os anexos de referência e os ajustes de cada modelo. No celular, o seletor de modo fica acima do compositor. A geração roda em segundo plano, permitindo iniciar outra criação enquanto as anteriores terminam. Sem provedor conectado e modelo habilitado, a geração fica desativada.
 
 <p align="center">
   <img src="docs/images/open-higgsfield-studio-mobile-pt-br.png" alt="Estúdio do Open-Higgsfield no celular em português" width="320" />
 </p>
 
-Capturas feitas com Playwright no build de produção, em um workspace isolado. As conexões e o prompt são demonstrativos; nenhuma chave real, mídia privada ou geração paga foi usada.
+Capturas feitas com Playwright no build de produção, em um workspace isolado. Conexões, prompts e ilustrações do litoral são dados demonstrativos, não resultados reais dos provedores. Nenhuma chave real, mídia privada ou geração paga foi usada.
 
 ## Provedores suportados
 
@@ -86,7 +94,7 @@ Conecte um provedor em **Provedores** ou configure suas credenciais por variáve
 | ToAPIs | 51 | 51 | `TOAPIS_API_KEY` |
 | Runware | 191 | 110 | `RUNWARE_API_KEY` |
 
-Contagens verificadas em `/api/catalog` em 3 de novembro de 2026. As entradas incluem variantes de uso, não apenas modelos distintos do provedor. Somente modelos habilitados de provedores conectados aparecem no Estúdio.
+Contagens verificadas em `/api/catalog` em 4 de novembro de 2026. As entradas incluem variantes de uso, não apenas modelos distintos do provedor. Somente modelos habilitados de provedores conectados aparecem no Estúdio.
 
 O catálogo inclui Gemini Image, Veo, Flux, Recraft, GPT Image, Kling, Wan, Runway, Seedance, Seedream, PixVerse, LTX, MiniMax, Z-Image e OmniHuman. Disponibilidade, preço, cotas e acesso preview são controlados por cada provedor.
 
@@ -103,7 +111,9 @@ Veja [Provedores e modelos](docs/providers.md) para credenciais e instruções d
 - Áudio nativo e múltiplas cenas quando suportados
 - Entradas por arrastar e soltar, colar, upload e URL pública
 - Tarefas síncronas e assíncronas normalizadas
-- Progresso ao vivo, reutilização de prompts, preview e download
+- Geração em segundo plano com progresso ao vivo e erros individuais por tarefa
+- Preview com zoom, reutilização de prompts, referências de imagem e download
+- Galeria com busca, tamanho ajustável de miniaturas, ordenação persistente, seleção pelo card inteiro, seleção retangular e ações em lote
 - Interface responsiva para desktop e mobile
 - Interface em inglês, português brasileiro e espanhol, com seletor de idioma persistente
 - Várias conexões criptografadas por provedor, prioridades, controle de modelos visíveis e descoberta de modelos quando disponível
@@ -237,6 +247,8 @@ Produção exige credencial do operador, origem HTTPS, PostgreSQL migrado, mídi
 Cada deploy é um workspace BYOK de um operador: quem tem a credencial acessa todas as tarefas e usa as mesmas contas dos provedores. Não há isolamento por usuário, orçamento monetário ou limite global de requisições no aplicativo. Configure cotas dos provedores e proteção na entrada. Arquivos do Cloudinary continuam públicos por URL.
 
 Siga o [guia de operação](docs/production.md) antes de iniciar Docker ou publicar na Vercel; ele descreve configuração, migração, HTTPS, agendamento e recuperação.
+
+Para atualizar um deploy existente, consulte o [checklist da Vercel](docs/deployment.md#updating-an-existing-vercel-deployment): integração Git, variáveis, migrações e validação. Estas alterações da galeria e do layout mobile não exigem novas variáveis de ambiente nem migrações de banco.
 
 ## Comandos
 
