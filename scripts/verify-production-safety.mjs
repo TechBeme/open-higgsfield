@@ -77,6 +77,44 @@ test("Basic access, strict configuration, origin and credential-role boundaries"
     assert.equal(development.guardWorkspaceRequest(new Request("http://example.test/api/tasks")).status, 403);
 });
 
+test("public demo serves pages without credentials and rejects writes before downstream work", async () => {
+    const env = { APP_DEMO_MODE: "true", GENERATION_ENABLED: "false", APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined };
+    const h = harness(env);
+    const access = h.load("@/server/security/workspace-access");
+    const { default: proxy } = h.load("src/proxy.ts");
+    for (const path of ["/en", "/pt-BR/settings", "/es", "/icon.svg", "/api/providers", "/api/catalog", "/api/image-models"]) {
+        const response = proxy(request(path, { authenticated: false }));
+        assert.notEqual(response.status, 401, path);
+        assert.notEqual(response.status, 503, path);
+        assert.equal(response.headers.get("www-authenticate"), null, path);
+        assert.equal(access.guardWorkspaceRequest(request(path, { authenticated: false })), null);
+    }
+    for (const [path, method] of [["generate", "POST"], ["generate-image", "POST"], ["providers", "POST"],
+        ["providers/[id]", "PATCH"], ["providers/[id]", "DELETE"], ["providers/[id]/test", "POST"],
+        ["catalog", "POST"], ["catalog", "PATCH"], ["catalog", "DELETE"], ["catalog/discover", "POST"],
+        ["gallery", "PATCH"], ["save-to-gallery", "POST"], ["tasks/[taskId]", "DELETE"],
+        ["internal/reconcile-workflows", "POST"]]) {
+        const route = h.load(`src/app/api/${path}/route.ts`);
+        const response = await route[method](request(`/api/${path}`, { method, authenticated: false, body: "unparsed fixture" }), context);
+        assert.equal(response.status, 403, `${method} ${path}`);
+        assert.equal((await response.json()).error, "ERR_DEMO_READ_ONLY");
+        assert.equal(response.headers.get("www-authenticate"), null);
+    }
+    assert.equal(h.calls.store + h.calls.submit + h.calls.uploads + h.calls.config + h.calls.worker, 0);
+    // Cached operator credentials cannot bypass read-only mode.
+    assert.equal(harness({ ...env, APP_ACCESS_USER: "operator", APP_ACCESS_PASSWORD: password })
+        .load("@/server/security/workspace-access").guardWorkspaceRequest(request("/api/providers", { method: "POST" })).status, 403);
+    assert.throws(() => h.load("@/server/config/production").assertGenerationEnabled(), /ERR_GENERATION_DISABLED/);
+});
+
+test("demo mode fails closed if generation is enabled or demo configuration is invalid", () => {
+    for (const env of [{ APP_DEMO_MODE: "true", GENERATION_ENABLED: "true" }, { APP_DEMO_MODE: "true", GENERATION_ENABLED: undefined },
+        { APP_DEMO_MODE: "typo" }, { APP_DEMO_MODE: "true", GENERATION_ENABLED: "false", APP_ORIGIN: undefined }]) {
+        const access = harness(env).load("@/server/security/workspace-access");
+        assert.equal(access.guardWorkspaceRequest(request("/en", { authenticated: false })).status, 503);
+    }
+});
+
 test("actual proxy covers APIs with extensions, image optimization and locale routing without scheduler redirects", () => {
     const loader = harness({ CRON_SECRET: cronSecret });
     const { default: proxy, config } = loader.load("src/proxy.ts");

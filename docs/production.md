@@ -7,6 +7,18 @@ and delete every task and use the configured provider accounts. There are no
 individual accounts, ownership boundaries, application monetary budgets or
 global request rate limits. Public multi-user service is unsupported.
 
+## Public demo
+
+To publish the interface without a password, set `APP_DEMO_MODE=true`,
+`GENERATION_ENABLED=false`, and `APP_ORIGIN` to its exact HTTPS origin. Omit
+`APP_ACCESS_USER` and `APP_ACCESS_PASSWORD`. All workspace write requests are
+rejected before parsing inputs or contacting providers; visitors can browse
+the Studio and provider settings but cannot save keys, upload, generate or
+change the shared data. Existing history and provider metadata remain visible,
+so use a separate empty database and no provider credentials for the demo.
+The storage and execution configuration below still applies. Redeploy after
+changing the environment. Private functional deployments keep demo mode off.
+
 Vercel Blob and S3 default to private originals with expiring, scoped links for
 browsers and AI providers. Legacy Cloudinary originals remain **public by URL**;
 app authentication does not make that CDN private. See [storage](storage.md).

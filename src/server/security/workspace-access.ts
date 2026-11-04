@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, timingSafeEqual } from "node:crypto";
 
-type WorkspaceConfiguration = { origin?: string; username?: string; password?: string };
+type WorkspaceConfiguration = { origin?: string; username?: string; password?: string; demo: boolean };
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const PRINTABLE_SECRET = /^[\x21-\x7e]{32,256}$/;
 
@@ -16,10 +16,13 @@ function loopback(url: URL): boolean {
 
 export function workspaceConfiguration(): WorkspaceConfiguration {
     const production = process.env.NODE_ENV === "production";
+    const demo = process.env.APP_DEMO_MODE === "true";
+    if ((process.env.APP_DEMO_MODE !== undefined && !["true", "false"].includes(process.env.APP_DEMO_MODE)) ||
+        (demo && process.env.GENERATION_ENABLED !== "false")) throw new Error("ERR_ACCESS_CONFIG");
     const username = process.env.APP_ACCESS_USER || undefined;
     const password = process.env.APP_ACCESS_PASSWORD || undefined;
     const rawOrigin = process.env.APP_ORIGIN || undefined;
-    if ((username || password || production) && (!username || !/^[A-Za-z0-9._@-]{1,128}$/.test(username) || !isStrongSecret(password))) {
+    if (!demo && (username || password || production) && (!username || !/^[A-Za-z0-9._@-]{1,128}$/.test(username) || !isStrongSecret(password))) {
         throw new Error("ERR_ACCESS_CONFIG");
     }
     let origin: string | undefined;
@@ -30,10 +33,10 @@ export function workspaceConfiguration(): WorkspaceConfiguration {
             (url.protocol !== "https:" && !(url.protocol === "http:" && !production && loopback(url)))) {
             throw new Error("ERR_ACCESS_CONFIG");
         }
-        if (!username && !loopback(url)) throw new Error("ERR_ACCESS_CONFIG");
+        if (!demo && !username && !loopback(url)) throw new Error("ERR_ACCESS_CONFIG");
         origin = url.origin;
     } else if (production) throw new Error("ERR_ACCESS_CONFIG");
-    return { origin, username, password };
+    return { origin, username, password, demo };
 }
 
 function secretEquals(candidate: string, expected: string): boolean {
@@ -62,6 +65,8 @@ export function guardWorkspaceRequest(request: Request): Response | null {
     let config: WorkspaceConfiguration;
     try { config = workspaceConfiguration(); }
     catch { return accessFailure("ERR_ACCESS_CONFIG", 503); }
+    // Public demos never authenticate visitors or allow writes, even with cached Basic credentials.
+    if (config.demo) return SAFE_METHODS.has(request.method.toUpperCase()) ? null : accessFailure("ERR_DEMO_READ_ONLY", 403);
     const url = new URL(request.url);
     if ((!config.username || !config.origin) && !loopback(url)) return accessFailure("ERR_LOCAL_ACCESS_ONLY", 403);
     if (config.username) {

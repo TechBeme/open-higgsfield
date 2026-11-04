@@ -31,6 +31,7 @@ export function assertRuntimeConfiguration(): { profile: "single-process" | "dis
 }
 
 export function assertGenerationEnabled(): void {
+    if (process.env.APP_DEMO_MODE === "true") throw new Error("ERR_GENERATION_DISABLED");
     const enabled = process.env.GENERATION_ENABLED ?? (process.env.NODE_ENV === "production" ? "false" : "true");
     if (enabled !== "true") throw new Error(enabled === "false" ? "ERR_GENERATION_DISABLED" : "ERR_GENERATION_CONFIG");
     assertRuntimeConfiguration();
