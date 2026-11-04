@@ -49,7 +49,8 @@ TASK_WORKER_MODE=workflow
 DATABASE_URL=<migrated-postgresql-connection>
 ASSET_STORAGE_MODE=vercel-blob
 ASSET_DELIVERY_MODE=private
-BLOB_READ_WRITE_TOKEN=<connected-private-store-token>
+# Vercel supplies BLOB_STORE_ID and VERCEL_OIDC_TOKEN for a connected store.
+# BLOB_READ_WRITE_TOKEN=<static-token-for-local-or-non-Vercel-hosts>
 GENERATION_ENABLED=false
 ```
 
