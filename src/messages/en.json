@@ -252,6 +252,7 @@
     "ERR_RUNWARE_REJECTED": "Runware rejected this request. Check your model settings, key and account balance.",
     "ERR_RUNWARE_RATE_LIMITED": "Runware is temporarily at capacity. Wait before trying again.",
     "ERR_RUNWARE_TASK_FAILED": "Runware could not complete this generation.",
+    "ERR_RUNWARE_CONTENT_BLOCKED": "Content blocked by the model's safety filters. This generation was rejected.",
     "ERR_RUNWARE_PARTIAL_RESULT": "Runware returned an incomplete batch. Check the task in Runware before creating another generation.",
     "ERR_RUNWARE_POLL_FAILED": "Could not retrieve this Runware task. Verify the original connection before resuming.",
     "ERR_RUNWARE_HTTP_401": "Runware did not accept this API key.",

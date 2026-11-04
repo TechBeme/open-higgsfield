@@ -93,6 +93,12 @@ and network errors during polling use the existing bounded backoff and
 public errors. A missing task or an authentication failure during observation
 is not treated as proof that generation failed.
 
+Runware can return a terminal generation error in an HTTP 400 response to
+`getResponse`. The adapter checks its task UUID, operation type and error status
+before marking that generation as failed. Content moderation rejections use a
+localized message; raw provider messages remain private. Unrelated HTTP 400
+lookup errors still pause observation instead of claiming generation failed.
+
 Submission has exactly one transport attempt. A lost response or timeout may
 mean that Runware accepted the task. The app records that outcome as uncertain;
 check the matching task UUID in Runware before submitting again. Changing keys

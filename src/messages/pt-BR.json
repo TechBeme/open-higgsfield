@@ -252,6 +252,7 @@
     "ERR_RUNWARE_REJECTED": "A Runware recusou esta solicitação. Confira os parâmetros, a chave e o saldo da conta.",
     "ERR_RUNWARE_RATE_LIMITED": "A Runware está temporariamente no limite de capacidade. Aguarde antes de tentar novamente.",
     "ERR_RUNWARE_TASK_FAILED": "A Runware não conseguiu concluir esta geração.",
+    "ERR_RUNWARE_CONTENT_BLOCKED": "Conteúdo bloqueado pelos filtros de segurança do modelo. Esta geração foi recusada.",
     "ERR_RUNWARE_PARTIAL_RESULT": "A Runware retornou um lote incompleto. Confira a tarefa na Runware antes de gerar novamente.",
     "ERR_RUNWARE_POLL_FAILED": "Não foi possível consultar a tarefa Runware. Verifique a conexão original antes de retomar.",
     "ERR_RUNWARE_HTTP_401": "A Runware não aceitou esta chave de API.",
