@@ -107,10 +107,25 @@ for (const [locale, m] of Object.entries({ en, "pt-BR": pt, es })) {
     });
 }
 
+for (const [locale, m] of Object.entries({ en, "pt-BR": pt, es })) {
+    test(`${locale}: a confirmed Runware content rejection shows the safety message instead of an unknown outcome`, async ({ page }) => {
+        const { state } = await gallery(page);
+        state.history = [{ task_id: "moderation-blocked", media_type: "image", model_id: "runware__openai-gpt-image-2-5-flare",
+            status: "FAILED", lifecycle_phase: "terminal", recovery_required: false, created_at: "2026-01-03T00:00:00Z",
+            error_message: "ERR_RUNWARE_CONTENT_BLOCKED", _done: true }];
+        await page.goto(`/${locale}`);
+        const item = card(page, "moderation-blocked:task");
+        await expect(item).toContainText(m.errors.ERR_RUNWARE_CONTENT_BLOCKED);
+        await expect(item).not.toContainText(m.tasks.recoveryRequired);
+        await expect(item).not.toContainText("ERR_RUNWARE_HTTP_400");
+        await expect(item).not.toContainText("safety_violations");
+    });
+}
+
 test("deleting one image keeps its sibling index and updates the gallery immediately", async ({ page }) => {
     const { mutations } = await gallery(page); await page.goto("/en");
     await tileAction(page, "gallery-a:0", en.tasks.delete);
-    await page.getByRole("alertdialog").getByRole("button", { name: en.tasks.deleteConfirm, exact: true }).click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
     await expect(card(page, "gallery-a:0")).toHaveCount(0);
     await expect(card(page, "gallery-a:1")).toBeVisible();
     await expect(card(page, "gallery-a:1").locator("img")).toHaveAttribute("src", "/api/download/gallery-a?index=1&inline=1");

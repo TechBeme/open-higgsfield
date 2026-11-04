@@ -209,6 +209,81 @@ test("HTTP, transport and malformed responses preserve submission uncertainty wi
     await assert.rejects(f.provider.poll(poll()), error => error.retryable && error.retryAfterMs === 17000 && !error.submissionUncertain);
 });
 
+test("Runware HTTP 400 moderation failures are terminal, localized codes rather than unknown observations", async () => {
+    for (const status of [200, 400]) for (const mediaType of ["image", "video"]) for (const error of [
+        { code: "invalidProviderContent", message: `Generated content rejected by content moderation. ${key}` },
+        { code: "providerBadRequest", message: `Your request was rejected by the safety system. safety_violations=[sexual]. ${key}` },
+    ]) {
+        const f = fixture(() => Response.json({ data: [], errors: [{ ...error, taskUUID: taskId,
+            taskType: mediaType === "image" ? "imageInference" : "videoInference", status: "error" }] }, { status }));
+        const result = await f.provider.poll(poll(mediaType));
+        assert.equal(result.status, "FAILED"); assert.equal(result.error, "ERR_RUNWARE_CONTENT_BLOCKED");
+        assert.equal(JSON.stringify(result).includes(key), false);
+        assert.equal(f.calls.length, 1); assert.equal(f.calls[0].task.taskType, "getResponse");
+    }
+    for (const status of [200, 400]) {
+        const f = fixture(() => Response.json({ errors: [{ taskUUID: taskId, taskType: "imageInference", status: "error",
+            code: "invalidProviderContent", message: key }] }, { status }));
+        await assert.rejects(f.provider.submit(request(f)), error => error.code === "ERR_RUNWARE_CONTENT_BLOCKED"
+            && !error.submissionUncertain && !error.retryable && !JSON.stringify(error).includes(key));
+        assert.equal(f.calls.length, 1);
+    }
+});
+
+test("HTTP 400 task errors stay distinct from lookup, authentication, malformed and partial responses", async () => {
+    const terminal = { taskUUID: taskId, taskType: "imageInference", status: "error", code: "providerBadRequest", message: `Invalid width. ${key}` };
+    const failed = fixture(() => Response.json({ data: [], errors: [terminal] }, { status: 400 }));
+    assert.equal((await failed.provider.poll(poll())).error, "ERR_RUNWARE_TASK_FAILED", "A parameter error is not inferred to be a safety rejection");
+    for (const row of [
+        { ...terminal, taskUUID: "22222222-2222-4222-8222-222222222222" },
+        { ...terminal, taskType: "getResponse" }, { ...terminal, taskType: "videoInference" },
+        { ...terminal, code: "taskNotFound" }, { ...terminal, code: "invalidApiKey" },
+        { ...terminal, status: undefined }, { ...terminal, code: undefined }, { ...terminal, taskType: undefined },
+    ]) {
+        const f = fixture(() => Response.json({ errors: [row] }, { status: 400 }));
+        await assert.rejects(f.provider.poll(poll()), error => error.code === "ERR_RUNWARE_HTTP_400" && !error.retryable);
+    }
+    for (const body of ["not-json", "null", "{}", '{"errors":[]}']) {
+        const f = fixture(() => new Response(body, { status: 400 }));
+        await assert.rejects(f.provider.poll(poll()), /ERR_RUNWARE_HTTP_400/);
+    }
+    for (const status of [401, 402, 403, 404, 429, 503]) {
+        const f = fixture(() => Response.json({ errors: [{ ...terminal, code: "invalidProviderContent" }] }, { status, headers: { "retry-after": "3" } }));
+        await assert.rejects(f.provider.poll(poll()), error => error.code === `ERR_RUNWARE_HTTP_${status}` && error.retryable === [429, 503].includes(status));
+    }
+    const partial = fixture(() => Response.json({ data: [{ taskType: "imageInference", taskUUID: taskId, status: "success", imageURL: image }], errors: [terminal] }, { status: 400 }));
+    await assert.rejects(partial.provider.poll(poll("image", 2)), /ERR_RUNWARE_PARTIAL_RESULT/);
+    const pending = fixture(() => Response.json({ data: [{ taskType: "imageInference", taskUUID: taskId, status: "processing" }], errors: [terminal] }, { status: 400 }));
+    assert.equal((await pending.provider.poll(poll("image", 2))).status, "IN_PROGRESS");
+});
+
+test("the real worker persists HTTP 400 content rejection as a finished failure without regenerating", async t => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "runware-moderation-"));
+    t.after(() => fs.rm(dir, { recursive: true, force: true }));
+    const calls = [];
+    const loader = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: dir, TASK_WORKER_MODE: "external", RUNWARE_API_KEY: key },
+        globals: { fetch: async (_url, init) => {
+            const task = JSON.parse(init.body)[0]; calls.push(task);
+            assert.equal(task.taskType, "getResponse", "The worker must never submit another paid generation");
+            return Response.json({ data: [], errors: [{ taskType: "imageInference", taskUUID: taskId, status: "error",
+                code: "invalidProviderContent", message: key }] }, { status: 400 });
+        } } });
+    const store = loader.load("@/server/tasks/store");
+    const worker = loader.load("@/server/tasks/poller");
+    await store.createTask({ task_id: taskId, media_type: "image", model_id: "runware__openai-gpt-image-2",
+        provider_id: "runware", provider_model_id: "openai:gpt-image@2", provider_connection_id: "env:runware",
+        provider_operation: operation(), created_at: new Date().toISOString(), status: "IN_PROGRESS", lifecycle_phase: "polling",
+        next_poll_at: new Date(Date.now() - 1000).toISOString(), deadline_at: new Date(Date.now() + 60000).toISOString(),
+        lease_token: null, lease_expires_at: null, poll_failures: 0, deleted_at: null });
+    await worker.processDueTasks({ taskId });
+    const task = await store.getPublicTask(taskId);
+    assert.equal(task.status, "FAILED"); assert.equal(task.lifecycle_phase, "terminal");
+    assert.equal(task.error_message, "ERR_RUNWARE_CONTENT_BLOCKED"); assert.equal(task.recovery_required, false);
+    await worker.processDueTasks({ taskId });
+    assert.equal(calls.length, 1);
+    assert.equal((await fs.readFile(path.join(dir, "tasks_history.json"), "utf8")).includes(key), false);
+});
+
 test("200 error envelopes and partial failures do not become successful generations or leaked diagnostics", async () => {
     for (const phase of ["submit", "poll"]) {
         const f = fixture(() => Response.json({ errors: [{ taskUUID: taskId, status: "error", code: "timeoutProvider", message: key }] }));

@@ -10,7 +10,7 @@ export const RUNWARE_ENDPOINT = "https://api.runware.ai/v1";
 export const isRunwareTaskId = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 /** A single REST attempt. Only the task worker retries observations; generation is never retried here. */
-export async function runwarePost(task: Record<string, unknown>, connection: ProviderConnectionContext | undefined, phase: "submit" | "poll", signal?: AbortSignal): Promise<Record<string, unknown>> {
+export async function runwarePost(task: Record<string, unknown>, connection: ProviderConnectionContext | undefined, phase: "submit" | "poll", signal?: AbortSignal, resultTaskType?: string): Promise<Record<string, unknown>> {
     if (connection && connection.providerId !== "runware") throw new ProviderRequestError("ERR_PROVIDER_CONNECTION_PROVIDER_MISMATCH");
     const key = connection ? connection.secret : process.env.RUNWARE_API_KEY;
     if (!key?.trim()) throw new ProviderRequestError("ERR_PROVIDER_CONNECTION_NOT_CONFIGURED");
@@ -18,14 +18,46 @@ export async function runwarePost(task: Record<string, unknown>, connection: Pro
     try {
         const response = await transport.fetch(RUNWARE_ENDPOINT, { method: "POST", cache: "no-store",
             headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify([task]) });
-        if (!response.ok) {
+        const errorTaskType = phase === "submit" ? task.taskType : resultTaskType;
+        const inspectTaskError = response.status === 400 && typeof errorTaskType === "string" && errorTaskType !== "modelSearch";
+        if (!response.ok && !inspectTaskError) {
             await response.body?.cancel().catch(() => undefined);
             throw providerHttpError("RUNWARE", phase, response.status, response.headers.get("retry-after"));
         }
         const bytes = await readBoundedResponse(response, { signal: transport.signal, maxBytes: 4 * 1024 * 1024 });
         transport.assertActive();
-        return providerObject(JSON.parse(bytes.toString("utf8")), "RUNWARE", phase);
+        let payload: Record<string, unknown>;
+        try { payload = providerObject(JSON.parse(bytes.toString("utf8")), "RUNWARE", phase); }
+        catch (error) {
+            if (!response.ok) throw providerHttpError("RUNWARE", phase, response.status, response.headers.get("retry-after"));
+            throw error;
+        }
+        // Runware also delivers terminal generation failures through HTTP 400.
+        // Only a matching generation error may reach the result interpreter;
+        // lookup/auth errors remain observation failures with an unknown outcome.
+        if (!response.ok && !isTaskError(payload, task.taskUUID, errorTaskType, phase)) {
+            throw providerHttpError("RUNWARE", phase, response.status, response.headers.get("retry-after"));
+        }
+        return payload;
     } catch (error) { throw transport.classify(error); }
+}
+
+function isTaskError(payload: Record<string, unknown>, taskUUID: unknown, taskType: unknown, phase: "submit" | "poll"): boolean {
+    return !payload.error && (payload.data === undefined || Array.isArray(payload.data))
+        && Array.isArray(payload.errors) && payload.errors.length > 0 && payload.errors.length <= 1000
+        && payload.errors.every(row => row && typeof row === "object" && !Array.isArray(row)
+            && row.taskUUID === taskUUID && row.taskType === taskType
+            && typeof row.code === "string" && row.code.length > 0 && row.code.length <= 200
+            && !["taskNotFound", "invalidApiKey"].includes(row.code)
+            && (phase === "submit" || row.status === "error"));
+}
+
+/** Inspect upstream wording only to classify it; never retain or expose it. */
+export function runwareTaskErrorCode(errors: Record<string, unknown>[]): string {
+    const blocked = errors.some(error => error.code === "invalidProviderContent"
+        || error.code === "providerBadRequest" && typeof error.message === "string"
+            && /\brejected by the safety system\b|\bsafety_violations\s*=\s*\[[^\]]+\]/i.test(error.message.slice(0, 8000)));
+    return blocked ? "ERR_RUNWARE_CONTENT_BLOCKED" : "ERR_RUNWARE_TASK_FAILED";
 }
 
 export function runwareResponseRows(payload: Record<string, unknown>, key: "data" | "errors", phase: "submit" | "poll"): Record<string, unknown>[] {

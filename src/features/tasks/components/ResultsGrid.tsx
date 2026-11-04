@@ -158,19 +158,23 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
         }, position * 300));
     }
     const mutate = (action: "delete" | "reorder", items: GalleryReference[]) => galleryMutation(mode, action, items);
-    async function remove() {
-        if (!deleting || busy) return;
+    async function removeItems(items: GalleryReference[], closeDialog = false) {
+        if (!items.length || busy) return;
         setBusy(true); setError(null);
         try {
-            await mutate("delete", deleting);
-            await history.removeGalleryItems(deleting);
+            await mutate("delete", items);
+            await history.removeGalleryItems(items);
             deleteOpener.current = resultsRegion.current;
-            setSelected(current => new Set([...current].filter(key => !deleting.some(item => galleryKey(item) === key))));
-            setAnnouncement(t("deletedCount", { count: deleting.length }));
-            setDeleting(null);
+            setSelected(current => new Set([...current].filter(key => !items.some(item => galleryKey(item) === key))));
+            setAnnouncement(t("deletedCount", { count: items.length }));
+            if (closeDialog) setDeleting(null);
             void history.mutate().catch(() => undefined);
         } catch (failure) { setError(failure instanceof Error ? failure.message : "ERR_GENERIC"); }
         finally { setBusy(false); }
+    }
+    async function remove() {
+        if (!deleting) return;
+        await removeItems(deleting, true);
     }
     function move(source: string, target: string) {
         setOver(null); setDragging(null);
@@ -254,7 +258,7 @@ function Gallery({ mode, empty, onReusePrompt, onSendImage }: GalleryProps) {
                 const movable = reorderable && canReorder(item);
                 return <GalleryTile key={key} item={item} selected={selected.has(key)} selecting={selecting} dragging={dragging === key} over={over === key}
                     canMoveBefore={movable && position > 0} canMoveAfter={movable && position >= 0 && position < sortable.length - 1}
-                    onSelect={range => toggle(item, range)} onDelete={() => requestDelete([item])}
+                    onSelect={range => toggle(item, range)} onDelete={() => void removeItems([{ taskId: item.taskId, index: item.index }])}
                     onReusePrompt={onReusePrompt && item.task.prompt ? () => onReusePrompt(item.task.prompt!) : undefined}
                     onSendImage={onSendImage && item.preview?.mediaType === "image" ? target => onSendImage(item.preview!.url, target) : undefined}
                     onPreview={() => { opener.current = document.activeElement as HTMLElement; setPreview({ items: allOutputs, index: allOutputs.findIndex(output => output.url === item.preview?.url) }); }}

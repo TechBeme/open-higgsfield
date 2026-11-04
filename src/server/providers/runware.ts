@@ -7,7 +7,7 @@ import { getRunwareContract, runwareCapabilities, runwareDimensionPairs, type Ru
 import { parseModelFields, validateModelMedia } from "@/models/parameter-schema";
 import type { GeneratedAsset, GenerationProvider, ProviderGenerationRequest, ProviderPollRequest, ProviderPollResult, ProviderSubmission } from "@/providers/types";
 import { invalidProviderResponse, ProviderRequestError, publicMediaUrl } from "./request-error";
-import { isRunwareTaskId, runwarePost, runwareResponseRows } from "./runware-client";
+import { isRunwareTaskId, runwarePost, runwareResponseRows, runwareTaskErrorCode } from "./runware-client";
 import { getMediaSlot } from "./utils";
 
 const ajv = new Ajv2020({ strict: false, validateFormats: false, ownProperties: true });
@@ -108,7 +108,7 @@ function readResult(payload: Record<string, unknown>, op: RunwareOperation, phas
     const errors = runwareResponseRows(payload, "errors", phase);
     if (payload.error || (!data.length && !errors.length)) throw invalidProviderResponse("RUNWARE", phase);
     if (data.some(row => row.taskUUID !== op.taskUUID || row.taskType !== taskType)
-        || errors.some(row => row.taskUUID !== undefined && row.taskUUID !== op.taskUUID)) throw invalidProviderResponse("RUNWARE", phase);
+        || errors.some(row => row.taskUUID !== undefined && row.taskUUID !== op.taskUUID || row.taskType !== undefined && row.taskType !== taskType)) throw invalidProviderResponse("RUNWARE", phase);
     if (errors.length) {
         if (errors.some(row => typeof row.code !== "string" || !row.code || row.code.length > 200)) throw invalidProviderResponse("RUNWARE", phase);
         if (errors.every(row => row.taskUUID === op.taskUUID && row.status === "error") && data.some(row => row.status === "processing")) {
@@ -121,15 +121,16 @@ function readResult(payload: Record<string, unknown>, op: RunwareOperation, phas
             const waits = errors.map(e => e.retryAfter).filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
             throw new ProviderRequestError("ERR_RUNWARE_RATE_LIMITED", { retryable: phase === "poll", retryAfterMs: waits.length ? Math.max(...waits) * 1000 : undefined });
         }
-        if (phase === "submit") throw new ProviderRequestError("ERR_RUNWARE_REJECTED");
-        if (errors.some(row => row.taskUUID === op.taskUUID && row.status === "error")) return { status: "FAILED", error: "ERR_RUNWARE_TASK_FAILED", operation: op };
+        const failure = runwareTaskErrorCode(errors);
+        if (phase === "submit") throw new ProviderRequestError(failure === "ERR_RUNWARE_CONTENT_BLOCKED" ? failure : "ERR_RUNWARE_REJECTED");
+        if (errors.some(row => row.taskUUID === op.taskUUID && row.status === "error")) return { status: "FAILED", error: failure, operation: op };
         // An observation error (auth, task not found, malformed lookup) is not evidence of a failed generation.
         throw new ProviderRequestError("ERR_RUNWARE_POLL_FAILED");
     }
     if (data.some(row => row.status === "error")) {
         if (data.some(row => row.status === "processing")) return { status: "IN_PROGRESS", operation: op };
         if (data.some(row => row[contract.outputUrlField])) throw new ProviderRequestError("ERR_RUNWARE_PARTIAL_RESULT", { submissionUncertain: phase === "submit" });
-        return { status: "FAILED", error: "ERR_RUNWARE_TASK_FAILED", operation: op };
+        return { status: "FAILED", error: runwareTaskErrorCode(data.map(row => row.error && typeof row.error === "object" ? row.error as Record<string, unknown> : row)), operation: op };
     }
     const assets: GeneratedAsset[] = [];
     const seen = new Set<string>();
@@ -161,7 +162,9 @@ export class RunwareProvider implements GenerationProvider {
     }
     async poll(request: ProviderPollRequest): Promise<ProviderPollResult> {
         const operation = operationOf(request);
-        const payload = await runwarePost({ taskType: "getResponse", taskUUID: operation.taskUUID }, request.connection, "poll", request.signal);
+        const contract = getRunwareContract(operation.model, operation.mediaType);
+        if (!contract) throw invalidProviderResponse("RUNWARE", "poll");
+        const payload = await runwarePost({ taskType: "getResponse", taskUUID: operation.taskUUID }, request.connection, "poll", request.signal, contract.operation);
         return readResult(payload, operation, "poll");
     }
 }
