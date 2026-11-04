@@ -10,6 +10,7 @@ const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from("ftypmp42"), 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const { BlobError } = blobSdk;
 const blobEnv = { ASSET_STORAGE_MODE: "vercel-blob", BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_Synthetic123_fixture", VERCEL: "1" };
+const blobOidcEnv = { ASSET_STORAGE_MODE: "vercel-blob", BLOB_STORE_ID: "store_Synthetic123", VERCEL: "1", VERCEL_OIDC_TOKEN: "synthetic-oidc-token" };
 const s3Env = { ASSET_STORAGE_MODE: "s3", S3_BUCKET: "synthetic-media", S3_REGION: "us-east-1",
     S3_ACCESS_KEY_ID: "synthetic-key", S3_SECRET_ACCESS_KEY: "synthetic-secret", VERCEL: "1" };
 const fixture = (media = "image", id = "synthetic") => ({ task_id: id, media_type: media, status: "COMPLETED", model_id: "synthetic", created_at: new Date(0).toISOString() });
@@ -61,7 +62,7 @@ function harness(env = blobEnv, options = {}) {
 }
 
 test("Blob/S3 production configuration is explicit, private by default and validated before work", () => {
-    for (const env of [blobEnv, s3Env]) assert.equal(harness(env).assets.assertGeneratedStorageConfigured(), env.ASSET_STORAGE_MODE);
+    for (const env of [blobEnv, blobOidcEnv, s3Env]) assert.equal(harness(env).assets.assertGeneratedStorageConfigured(), env.ASSET_STORAGE_MODE);
     assert.equal(harness({ ...blobEnv, BLOB_STORE_ID: "store_Synthetic123" }).storage.blobConfiguration().storeId, "synthetic123");
     for (const env of [
         { ASSET_STORAGE_MODE: "vercel-blob" }, { ...blobEnv, ASSET_DELIVERY_MODE: "invalid" },
@@ -69,6 +70,16 @@ test("Blob/S3 production configuration is explicit, private by default and valid
         { ...s3Env, S3_ENDPOINT: "http://127.0.0.1" }, { ...s3Env, S3_ENDPOINT: "https://user:pass@example.com" },
         { ...s3Env, ASSET_DELIVERY_MODE: "public" }, { ...s3Env, S3_FORCE_PATH_STYLE: "yes" },
     ]) assert.throws(() => harness(env).assets.assertGeneratedStorageConfigured(), /ERR_/);
+});
+
+test("Vercel Blob OIDC uses the connected store without requiring a static read-write token", async () => {
+    const h = harness(blobOidcEnv); const task = fixture("image", "oidc");
+    await h.assets.attachGeneratedAssets(task, [{ data: png, mimeType: "image/png" }]);
+    assert.equal(h.calls.put[0].config.storeId, "synthetic123");
+    assert.equal(h.calls.put[0].config.token, undefined);
+    await h.source.taskAssetResponse(task, 0, new Request("http://localhost/"), false);
+    assert.equal(h.calls.issue.at(-1).storeId, "synthetic123");
+    assert.equal(h.calls.issue.at(-1).token, undefined);
 });
 
 test("private Blob outputs persist stable references, scoped signing happens only at read/reuse/download", async () => {

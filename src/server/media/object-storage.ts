@@ -38,12 +38,19 @@ function httpsOrigin(value: string): string {
 
 export function blobConfiguration() {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    // This is the static read-write token format also used by the official SDK.
+    const oidcAvailable = Boolean(process.env.VERCEL_OIDC_TOKEN);
+    // Vercel's recommended deployment path uses the short-lived OIDC token
+    // paired with BLOB_STORE_ID. A static read-write token remains supported
+    // for local development and non-Vercel hosts.
     const rawStoreId = process.env.BLOB_STORE_ID ?? /^vercel_blob_rw_([A-Za-z0-9]+)_/.exec(token ?? "")?.[1];
     const storeId = rawStoreId?.replace(/^store_/, "").toLowerCase();
-    if (!printable(token, 4096) || !storeId || !/^[a-z0-9]{1,64}$/.test(storeId)) throw new Error("ERR_VERCEL_BLOB_NOT_CONFIGURED");
+    if ((!printable(token, 4096) && !oidcAvailable) || !storeId || !/^[a-z0-9]{1,64}$/.test(storeId)) throw new Error("ERR_VERCEL_BLOB_NOT_CONFIGURED");
     const access = accessMode();
-    return { token, storeId, access, origin: `https://${storeId}.${access}.blob.vercel-storage.com` };
+    return { token, storeId, oidcAvailable, access, origin: `https://${storeId}.${access}.blob.vercel-storage.com` };
+}
+
+function blobAuth(config: ReturnType<typeof blobConfiguration>) {
+    return { storeId: config.storeId, ...(config.token ? { token: config.token } : {}) };
 }
 
 export function s3Configuration() {
@@ -135,7 +142,7 @@ export async function uploadObject(bytes: Buffer, key: string, mimeType: string,
         if (mode === "vercel-blob") {
             const config = blobConfiguration();
             try {
-                const result = await withAbort(put(key, bytes, { token: config.token, access: config.access, addRandomSuffix: false,
+                const result = await withAbort(put(key, bytes, { ...blobAuth(config), access: config.access, addRandomSuffix: false,
                     allowOverwrite: false, contentType: mime, abortSignal: signal }), signal);
                 if (result.pathname.replace(/^\//, "") !== key || result.url !== objectReference(key)) throw new Error("ERR_VERCEL_BLOB_RESPONSE");
             } catch (error) {
@@ -143,7 +150,7 @@ export async function uploadObject(bytes: Buffer, key: string, mimeType: string,
                 // than a dedicated exists class. Reconcile an uncertain write
                 // only if HEAD confirms the exact immutable content identity.
                 if (!(error instanceof BlobError) || signal.aborted) throw error;
-                const existing = await withAbort(head(objectReference(key), { token: config.token, abortSignal: signal }), signal);
+                const existing = await withAbort(head(objectReference(key), { ...blobAuth(config), abortSignal: signal }), signal);
                 if (existing.size !== bytes.length || existing.contentType !== mime) throw new Error("ERR_ASSET_CONTENT_CONFLICT");
             }
         } else {
@@ -182,7 +189,7 @@ export async function storedObjectUrl(reference: string, options: TransferOption
                 return url.toString();
             }
             const validUntil = Date.now() + expiresIn * 1_000;
-            const token = await withAbort(issueSignedToken({ token: config.token, pathname: key, operations: ["get"], validUntil, abortSignal: signal }), signal);
+            const token = await withAbort(issueSignedToken({ ...blobAuth(config), pathname: key, operations: ["get"], validUntil, abortSignal: signal }), signal);
             const result = await withAbort(presignUrl(token, { operation: "get", pathname: key, access: "private", validUntil }), signal);
             const url = new URL(result.presignedUrl);
             if (url.origin !== config.origin || url.pathname !== `/${key}`) throw new Error("ERR_VERCEL_BLOB_RESPONSE");

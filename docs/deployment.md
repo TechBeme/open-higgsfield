@@ -67,7 +67,7 @@ Required server-side settings for the supported Vercel profile:
 | `DEPLOYMENT_PROFILE`, `TASK_WORKER_MODE` | `distributed`, `workflow` |
 | `DATABASE_URL` | Migrated PostgreSQL/Neon database |
 | `ASSET_STORAGE_MODE`, `ASSET_DELIVERY_MODE` | `vercel-blob`, `private` (or the documented S3 profile) |
-| `BLOB_READ_WRITE_TOKEN` | Automatically supplied by the connected private Blob store; S3 uses its own credentials |
+| `BLOB_STORE_ID`, Vercel OIDC system environment | Automatically supplied by the connected private Blob store; a static `BLOB_READ_WRITE_TOKEN` is only needed outside Vercel; S3 uses its own credentials |
 | Vercel project settings | Fluid compute and access to System Environment Variables enabled |
 | `GENERATION_ENABLED` | `true` only when storage, Workflow delivery and provider limits are ready |
 

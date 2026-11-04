@@ -81,7 +81,8 @@ TASK_WORKER_MODE=workflow
 DATABASE_URL=<postgresql-or-neon-connection-string>
 ASSET_STORAGE_MODE=vercel-blob
 ASSET_DELIVERY_MODE=private
-BLOB_READ_WRITE_TOKEN=<connected-private-blob-store-token>
+# Vercel supplies BLOB_STORE_ID and VERCEL_OIDC_TOKEN for a connected store.
+# BLOB_READ_WRITE_TOKEN=<static-token-for-local-or-non-Vercel-hosts>
 ```
 
 S3 is also supported; see [media storage](storage.md) for settings and credentials.

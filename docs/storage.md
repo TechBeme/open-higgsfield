@@ -19,16 +19,19 @@ and generated images/videos remotely, without relying on ephemeral local disk.
 ### Vercel Blob
 
 Create a **private** Blob store under Storage in the Vercel dashboard and connect
-it to the project. The integration supplies `BLOB_READ_WRITE_TOKEN`. Configure:
+it to the project. Vercel supplies `BLOB_STORE_ID` and its short-lived
+`VERCEL_OIDC_TOKEN` system variable automatically. Configure:
 
 ```dotenv
 ASSET_STORAGE_MODE=vercel-blob
 ASSET_DELIVERY_MODE=private
-BLOB_READ_WRITE_TOKEN=<server-side-store-token>
+# Only needed for local/non-Vercel hosts; Vercel uses OIDC automatically.
+# BLOB_READ_WRITE_TOKEN=<server-side-store-token>
 ```
 
-The store ID is inferred from the token; `BLOB_STORE_ID` is an optional override.
-The store's actual access setting must match `ASSET_DELIVERY_MODE`. The app uses
+The store ID is read from `BLOB_STORE_ID` for OIDC, or inferred from a static
+token when one is used. The store's actual access setting must match
+`ASSET_DELIVERY_MODE`. The app uses
 the official Blob SDK, immutable content-addressed uploads and exact-path,
 GET-only delegated signed URLs. No store-wide read token is sent to a browser or
 AI provider. A public Blob store is supported only with explicit
