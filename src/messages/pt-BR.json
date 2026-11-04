@@ -193,7 +193,26 @@
     "selectItem": "Selecionar {name}",
     "dragToReorder": "Arrastar para reordenar {name}",
     "moveEarlier": "Mover {name} para antes",
-    "moveLater": "Mover {name} para depois"
+    "moveLater": "Mover {name} para depois",
+    "delete": "Excluir",
+    "open": "Abrir",
+    "download": "Baixar",
+    "reusePrompt": "Reutilizar prompt",
+    "moreActions": "Mais ações",
+    "useAsReference": "Usar como referência",
+    "animateFromStart": "Animar a partir deste quadro",
+    "animateToEnd": "Animar terminando neste quadro",
+    "reference": "Referência",
+    "animate": "Animar",
+    "framePlacement": "Posição do quadro",
+    "startFrame": "Quadro inicial",
+    "endFrame": "Quadro final",
+    "downloadSelected": "Baixar",
+    "viewOptions": "Opções de exibição",
+    "statusLabel": "Status",
+    "orderLabel": "Ordem",
+    "densityLabel": "Tamanho das prévias",
+    "clearSearch": "Limpar busca"
   },
   "errors": {
     "ERR_NO_API_KEY": "Conecte uma conta em Provedores antes de gerar.",
@@ -245,7 +264,8 @@
     "ERR_UNSUPPORTED_MEDIA_TYPE": "Este tipo de arquivo não é aceito pelo modelo selecionado. Anexe uma imagem, vídeo ou áudio compatível.",
     "ERR_INVALID_MODEL_PARAMS": "Algumas configurações de geração são inválidas para este modelo. Revise as configurações e tente novamente.",
     "ERR_GALLERY_CONFLICT": "A galeria mudou durante a edição. Recarregue o histórico e tente novamente.",
-    "ERR_GALLERY_INVALID_REQUEST": "Não foi possível salvar esta seleção. Selecione até 1.000 itens atuais e tente novamente."
+    "ERR_GALLERY_INVALID_REQUEST": "Não foi possível salvar esta seleção. Selecione até 1.000 itens atuais e tente novamente.",
+    "ERR_END_FRAME_UNSUPPORTED": "O modelo de vídeo selecionado não aceita quadro final. Escolha um modelo com quadro inicial e final."
   },
   "validation": {
     "promptRequired": "O prompt é obrigatório",

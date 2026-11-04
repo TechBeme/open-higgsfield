@@ -48,12 +48,24 @@ async function gallery(page: Page) {
 const cards = (page: Page) => page.locator("[data-gallery-key]");
 const card = (page: Page, key: string) => page.locator(`[data-gallery-key="${key}"]`);
 async function keys(page: Page) { return cards(page).evaluateAll(nodes => nodes.map(node => node.getAttribute("data-gallery-key"))); }
+/** Filters, sorting, density and organizing live in one header popover to keep the gallery chrome to a single row. */
+/** Desktop shows quick actions on hover; touchscreens keep them in each tile's "more" menu. */
+const touch = () => test.info().project.name === "mobile-chromium";
+async function tileAction(page: Page, key: string, name: string) {
+    if (!touch()) { await card(page, key).hover(); return card(page, key).getByRole("button", { name, exact: true }).click(); }
+    await card(page, key).getByRole("button", { name: en.tasks.moreActions, exact: true }).click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+}
+async function viewOptions(page: Page, m: typeof en = en) { await page.getByRole("button", { name: m.tasks.viewOptions, exact: true }).click(); }
 
 for (const [locale, m] of Object.entries({ en, "pt-BR": pt, es })) {
     test(`${locale}: gallery renders selection, filters, responsive layouts and accessible actions`, async ({ page }, info) => {
         await gallery(page); await page.goto(`/${locale}`);
         await expect(cards(page)).toHaveCount(4);
-        await page.getByRole("button", { name: m.tasks.select, exact: true }).click();
+        const header = await page.locator("[data-workspace-header]").boundingBox();
+        expect(header!.height, "Navigation and gallery tools share one compact row").toBeLessThanOrEqual(56);
+        await card(page, "gallery-a:0").hover();
+        await expect(card(page, "gallery-a:0").getByRole("button", { name: touch() ? m.tasks.moreActions : m.tasks.delete, exact: true })).toBeVisible();
         await card(page, "gallery-a:0").getByRole("checkbox").click();
         await card(page, "gallery-b:0").getByRole("checkbox").click();
         await expect(page.getByRole("button", { name: m.tasks.deleteSelected })).toBeEnabled();
@@ -61,13 +73,15 @@ for (const [locale, m] of Object.entries({ en, "pt-BR": pt, es })) {
         expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
         await page.screenshot({ path: info.outputPath(`gallery-${locale}-selected.png`), fullPage: true });
         await page.getByRole("button", { name: m.tasks.cancelSelection }).click();
+        await page.getByRole("button", { name: m.tasks.searchGallery, exact: true }).click();
         await page.getByRole("searchbox", { name: m.tasks.searchGallery }).fill("forest");
         await expect(cards(page)).toHaveCount(1);
         await page.getByRole("searchbox", { name: m.tasks.searchGallery }).fill("");
+        await viewOptions(page, m);
         await page.getByRole("combobox", { name: m.tasks.filterGallery }).selectOption("failed");
         await expect(cards(page)).toHaveCount(1);
         await page.getByRole("combobox", { name: m.tasks.filterGallery }).selectOption("all");
-        await page.getByRole("button", { name: m.tasks.compactGrid }).click();
+        await page.getByRole("button", { name: m.tasks.compactGrid, exact: true }).click();
         await expectWithinViewport(page);
         await page.screenshot({ path: info.outputPath(`gallery-${locale}-compact.png`), fullPage: true });
         await page.getByRole("combobox", { name: m.tasks.sortGallery }).selectOption("oldest");
@@ -75,22 +89,16 @@ for (const [locale, m] of Object.entries({ en, "pt-BR": pt, es })) {
         await page.getByRole("combobox", { name: m.tasks.sortGallery }).selectOption("newest");
         await expect.poll(async () => (await keys(page))[0]).toBe("gallery-a:0");
         if (info.project.name === "mobile-chromium") {
-            const region = page.getByRole("region", { name: m.tasks.feedTitle, exact: true });
-            await region.evaluate(node => { node.scrollTop = node.scrollHeight; });
-            await expect.poll(async () => region.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
-            await expect.poll(async () => {
-                const heading = await region.getByRole("heading").boundingBox();
-                const bounds = await region.boundingBox();
-                return heading!.y < bounds!.y;
-            }).toBe(true);
-            await page.screenshot({ path: info.outputPath(`gallery-${locale}-scrolled.png`), fullPage: true });
+            // Justified rows fit at least two square previews side by side on a phone instead of one oversized tile.
+            const widths = await cards(page).evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().width));
+            expect(Math.max(...widths)).toBeLessThan(page.viewportSize()!.width * 0.75);
         }
     });
 }
 
 test("deleting one image keeps its sibling index and updates the gallery immediately", async ({ page }) => {
     const { mutations } = await gallery(page); await page.goto("/en");
-    await card(page, "gallery-a:0").getByRole("button", { name: en.tasks.deleteConfirm, exact: true }).click();
+    await tileAction(page, "gallery-a:0", en.tasks.delete);
     await page.getByRole("alertdialog").getByRole("button", { name: en.tasks.deleteConfirm, exact: true }).click();
     await expect(card(page, "gallery-a:0")).toHaveCount(0);
     await expect(card(page, "gallery-a:1")).toBeVisible();
@@ -101,7 +109,7 @@ test("deleting one image keeps its sibling index and updates the gallery immedia
 
 test("select visible deletes multiple outputs and failed tasks in one confirmed batch", async ({ page }) => {
     const { mutations } = await gallery(page); await page.goto("/en");
-    await page.getByRole("button", { name: en.tasks.select, exact: true }).click();
+    await card(page, "gallery-b:0").getByRole("checkbox").click();
     await page.getByRole("button", { name: en.tasks.selectVisible, exact: true }).click();
     await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(4);
     await page.getByRole("button", { name: en.tasks.deleteSelected }).click();
@@ -133,7 +141,7 @@ test("failed deletion preserves selection and retry removes only the chosen imag
 test("drag ordering persists after reload and does not activate the Studio drop overlay", async ({ page }, info) => {
     test.skip(info.project.name === "mobile-chromium", "Touchscreen ordering uses the move buttons covered by the keyboard/mobile test.");
     await gallery(page); await page.goto("/en");
-    await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
+    await viewOptions(page); await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
     await card(page, "gallery-b:0").getByRole("button", { name: /^Drag to reorder/ }).dragTo(card(page, "gallery-a:0"), { steps: 12 });
     expect((await keys(page))[0]).toBe("gallery-b:0");
     await expect(page.locator("[data-studio-composer]").getByRole("textbox")).toBeVisible();
@@ -148,13 +156,13 @@ test("keyboard/mobile reorder buttons can be cancelled, saved and retried after 
     const { failures, mutations } = await gallery(page); await page.goto("/en");
     await expect(cards(page)).toHaveCount(4);
     const original = await keys(page);
-    await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
+    await viewOptions(page); await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
     await card(page, "gallery-a:1").getByRole("button", { name: /^Move .* earlier$/ }).click();
     expect((await keys(page))[0]).toBe("gallery-a:1");
     await page.getByRole("button", { name: en.tasks.cancel, exact: true }).click();
     expect(await keys(page)).toEqual(original);
     expect(mutations).toHaveLength(0);
-    await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
+    await viewOptions(page); await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
     await card(page, "gallery-a:1").getByRole("button", { name: /^Move .* earlier$/ }).click();
     failures.reorder = true;
     await page.getByRole("button", { name: en.tasks.saveOrder }).click();
@@ -170,7 +178,6 @@ test("keyboard/mobile reorder buttons can be cancelled, saved and retried after 
 test("shift range and keyboard selection operate on visible images without deleting anything", async ({ page }) => {
     const { mutations } = await gallery(page); await page.goto("/en");
     await expect(cards(page)).toHaveCount(4);
-    await page.getByRole("button", { name: en.tasks.select, exact: true }).click();
     await card(page, "gallery-a:0").getByRole("checkbox").click();
     await card(page, "gallery-b:0").getByRole("checkbox").click({ modifiers: ["Shift"] });
     await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(3);
@@ -184,7 +191,7 @@ test("shift range and keyboard selection operate on visible images without delet
 
 test("a confirmed saved order remains visible when the follow-up history refresh fails", async ({ page }) => {
     const { state, failures, mutations } = await gallery(page); await page.goto("/en");
-    await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
+    await viewOptions(page); await page.getByRole("button", { name: en.tasks.organize, exact: true }).click();
     await card(page, "gallery-a:1").getByRole("button", { name: /^Move .* earlier$/ }).click();
     failures.refresh = true;
     await page.getByRole("button", { name: en.tasks.saveOrder }).click();
@@ -196,4 +203,15 @@ test("a confirmed saved order remains visible when the follow-up history refresh
     await expect(page.getByText(en.tasks.historyError)).toHaveCount(0);
     expect((await keys(page))[0]).toBe("gallery-a:1");
     expect(mutations).toHaveLength(1);
+});
+
+test("hover actions reuse a prompt and send an image to the composer as a reference", async ({ page }) => {
+    await gallery(page); await page.goto("/en");
+    const tile = card(page, "gallery-b:0");
+    await tileAction(page, "gallery-b:0", en.tasks.reusePrompt);
+    await expect(page.locator("[data-studio-composer]").getByRole("textbox")).toHaveValue("A modern house in the forest");
+    await tile.hover();
+    await tile.getByRole("button", { name: en.tasks.moreActions, exact: true }).click();
+    await page.getByRole("menuitem", { name: en.tasks.useAsReference, exact: true }).click();
+    await expect(page.locator("[data-studio-composer]").getByRole("button", { name: en.commandBar.removeAttachment.replace("{name}", en.commandBar.urlReference) })).toBeVisible();
 });

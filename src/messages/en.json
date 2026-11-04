@@ -193,7 +193,26 @@
     "selectItem": "Select {name}",
     "dragToReorder": "Drag to reorder {name}",
     "moveEarlier": "Move {name} earlier",
-    "moveLater": "Move {name} later"
+    "moveLater": "Move {name} later",
+    "delete": "Delete",
+    "open": "Open",
+    "download": "Download",
+    "reusePrompt": "Reuse prompt",
+    "moreActions": "More actions",
+    "useAsReference": "Use as reference",
+    "animateFromStart": "Animate from this frame",
+    "animateToEnd": "Animate ending on this frame",
+    "reference": "Reference",
+    "animate": "Animate",
+    "framePlacement": "Frame placement",
+    "startFrame": "Start frame",
+    "endFrame": "End frame",
+    "downloadSelected": "Download",
+    "viewOptions": "View options",
+    "statusLabel": "Status",
+    "orderLabel": "Order",
+    "densityLabel": "Preview size",
+    "clearSearch": "Clear search"
   },
   "errors": {
     "ERR_NO_API_KEY": "Connect an account in Providers before generating.",
@@ -245,7 +264,8 @@
     "ERR_UNSUPPORTED_MEDIA_TYPE": "This file type is not supported by the selected model. Add a compatible image, video or audio file.",
     "ERR_INVALID_MODEL_PARAMS": "Some generation settings are invalid for this model. Review the settings and try again.",
     "ERR_GALLERY_CONFLICT": "The gallery changed while you were editing. Reload the history and try again.",
-    "ERR_GALLERY_INVALID_REQUEST": "This selection cannot be saved. Select up to 1,000 current items and try again."
+    "ERR_GALLERY_INVALID_REQUEST": "This selection cannot be saved. Select up to 1,000 current items and try again.",
+    "ERR_END_FRAME_UNSUPPORTED": "The selected video model does not accept an end frame. Choose a model with start and end frames."
   },
   "validation": {
     "promptRequired": "Prompt is required",

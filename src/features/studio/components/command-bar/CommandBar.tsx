@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect, useEffectEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -39,14 +39,18 @@ import { useModelCopy } from "@/i18n/use-model-copy";
 const schema = z.object({ prompt: z.string().max(65536) });
 type FormData = z.infer<typeof schema>;
 
+export interface IncomingImage { url: string; target: "reference" | "start" | "end"; mode: "image" | "video"; revision: number }
+
 interface CommandBarProps {
     mode: "video" | "image";
     onPromptSupportChange: (supported: boolean) => void;
     suggestion?: { text: string; revision: number };
+    /** A gallery image sent to the composer as a reference or as a video start/end frame. */
+    incoming?: IncomingImage;
     onModeChange: (mode: "video" | "image") => void;
 }
 
-export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChange }: CommandBarProps) {
+export function CommandBar({ mode, onModeChange, suggestion, incoming, onPromptSupportChange }: CommandBarProps) {
     const t = useTranslations("studio");
     const tErrors = useTranslations("errors");
     const tCommon = useTranslations("common");
@@ -315,6 +319,20 @@ export function CommandBar({ mode, onModeChange, suggestion, onPromptSupportChan
         dragDepthRef.current = 0;
         attachTransferredFiles(readMediaTransfer(event.dataTransfer, window.location.origin), target);
     }
+
+    const attachIncoming = useEffectEvent((image: IncomingImage) => {
+        const frame = image.target === "end" ? /end|last/i : image.target === "start" ? /start|first/i : null;
+        const preferred = frame ? dropTargets.find(target => target.kind === "image" && target.roleIds.some(id => frame.test(id))) : undefined;
+        if (image.target === "end" && !preferred) { setApiError("ERR_END_FRAME_UNSUPPORTED"); return; }
+        attachTransferredFiles([new File([], image.url, { type: "image/png" })], preferred);
+    });
+    const consumedIncoming = useRef(0);
+    useEffect(() => {
+        // Wait until the requested mode is active so the new model's slots receive the image.
+        if (!incoming || incoming.mode !== mode || consumedIncoming.current === incoming.revision) return;
+        consumedIncoming.current = incoming.revision;
+        attachIncoming(incoming);
+    }, [incoming, mode]);
 
     // ── Handlers ──
     const handleVideoModelChange = useCallback((id: string, varId: string) => {
