@@ -38,19 +38,22 @@ function httpsOrigin(value: string): string {
 
 export function blobConfiguration() {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    const oidcAvailable = Boolean(process.env.VERCEL_OIDC_TOKEN);
+    // Vercel can supply OIDC through the request context rather than process.env;
+    // startup runs before a request exists. Let the SDK resolve it at call time.
+    const oidcAvailable = Boolean(process.env.VERCEL_OIDC_TOKEN || (process.env.VERCEL && process.env.BLOB_STORE_ID));
     // Vercel's recommended deployment path uses the short-lived OIDC token
     // paired with BLOB_STORE_ID. A static read-write token remains supported
     // for local development and non-Vercel hosts.
     const rawStoreId = process.env.BLOB_STORE_ID ?? /^vercel_blob_rw_([A-Za-z0-9]+)_/.exec(token ?? "")?.[1];
-    const storeId = rawStoreId?.replace(/^store_/, "").toLowerCase();
+    const sdkStoreId = rawStoreId?.replace(/^store_/, "");
+    const storeId = sdkStoreId?.toLowerCase();
     if ((!printable(token, 4096) && !oidcAvailable) || !storeId || !/^[a-z0-9]{1,64}$/.test(storeId)) throw new Error("ERR_VERCEL_BLOB_NOT_CONFIGURED");
     const access = accessMode();
-    return { token, storeId, oidcAvailable, access, origin: `https://${storeId}.${access}.blob.vercel-storage.com` };
+    return { token, storeId, sdkStoreId, oidcAvailable, access, origin: `https://${storeId}.${access}.blob.vercel-storage.com` };
 }
 
 function blobAuth(config: ReturnType<typeof blobConfiguration>) {
-    return { storeId: config.storeId, ...(config.token ? { token: config.token } : {}) };
+    return { storeId: config.sdkStoreId, ...(config.token ? { token: config.token } : {}) };
 }
 
 export function s3Configuration() {
