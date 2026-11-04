@@ -261,7 +261,7 @@ Configure the production access and single-process profile from the [operator gu
 
 ## Deploy on Vercel
 
-Functional production deployments require an operator credential, an HTTPS origin, migrated PostgreSQL task storage, durable Vercel Blob or S3 media storage and **Vercel Workflows** for background submission, observation and media storage. For a public interface demo without login, use `APP_DEMO_MODE=true` with `GENERATION_ENABLED=false`; see [public demo configuration](docs/production.md#public-demo). No minute Cron or GitHub scheduler is required. See [background execution](docs/background-execution.md) for configuration and usage costs. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
+Functional production deployments use no built-in login and require an HTTPS origin, migrated PostgreSQL task storage, durable Vercel Blob or S3 media storage and **Vercel Workflows** for background submission, observation and media storage. For a public interface demo without login, use `APP_DEMO_MODE=true` with `GENERATION_ENABLED=false`; see [public demo configuration](docs/production.md#public-demo). No minute Cron or GitHub scheduler is required. See [background execution](docs/background-execution.md) for configuration and usage costs. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
 
 Each deployment is one operator-owned BYOK workspace. There are no per-user
 ownership boundaries, application monetary budgets or global rate limits; if the

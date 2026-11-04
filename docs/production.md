@@ -1,40 +1,35 @@
-# Production: one protected operator workspace
+# Production: one personal workspace
 
-Production requires HTTP Basic authentication, HTTPS, explicit persistent
-storage/execution configuration and deliberate generation enablement. This is
-one shared BYOK workspace: every credential holder can see, download, resume
-and delete every task and use the configured provider accounts. There are no
-individual accounts, ownership boundaries, application monetary budgets or
-global request rate limits. Public multi-user service is unsupported.
+The application has no built-in login or password protection. Each deployment
+is one shared personal workspace: anyone who can access its URL can view its
+history and settings and, outside demo mode, change settings and use configured
+provider accounts. There are no individual accounts or ownership boundaries.
+Production uses HTTPS, explicit persistent storage/execution configuration and
+deliberate generation enablement.
 
 ## Public demo
 
-To publish the interface without a password, set `APP_DEMO_MODE=true`,
-`GENERATION_ENABLED=false`, and `APP_ORIGIN` to its exact HTTPS origin. Omit
-`APP_ACCESS_USER` and `APP_ACCESS_PASSWORD`. All workspace write requests are
-rejected before parsing inputs or contacting providers; visitors can browse
-the Studio and provider settings but cannot save keys, upload, generate or
-change the shared data. Existing history and provider metadata remain visible,
-so use a separate empty database and no provider credentials for the demo.
-The storage and execution configuration below still applies. Redeploy after
-changing the environment. Private functional deployments keep demo mode off.
+To publish a read-only interface demo, set `APP_DEMO_MODE=true`,
+`GENERATION_ENABLED=false`, and `APP_ORIGIN` to its exact HTTPS origin. All
+workspace write requests are rejected before parsing inputs or contacting
+providers; visitors can browse the Studio and provider settings but cannot save
+keys, upload, generate or change shared data. Existing history and provider
+metadata remain visible, so use a separate empty database and no provider
+credentials for the demo. The storage/execution configuration below still
+applies. Redeploy after changing the environment. Personal functional deployments
+leave demo mode off; they also have no application login.
 
 Vercel Blob and S3 default to private originals with expiring, scoped links for
-browsers and AI providers. Legacy Cloudinary originals remain **public by URL**;
-app authentication does not make that CDN private. See [storage](storage.md).
+browsers and AI providers. The app's media routes issue those links without a
+login. Legacy Cloudinary originals remain public by URL. See [storage](storage.md).
 
 ## Common configuration
 
 Use platform secrets or a restricted environment file, never `NEXT_PUBLIC_*`,
-logs or command-line arguments. Generate independent random operator/scheduler
-secrets with your secret manager: 32-256 printable non-space ASCII characters.
-Do not reuse personal passwords. Usernames allow letters, digits, `.`, `_`, `@`,
-`-`. Replace the placeholders below:
+logs or command-line arguments. Replace the placeholders below:
 
 ```dotenv
 APP_ORIGIN=https://studio.example.com
-APP_ACCESS_USER=operator
-APP_ACCESS_PASSWORD=<dedicated-random-secret-at-least-32-characters>
 GENERATION_ENABLED=false
 TASK_OBSERVATION_TIMEOUT_MS=86400000
 # Required before saving connections from /<locale>/settings.
@@ -43,24 +38,15 @@ PROVIDER_CONFIG_ENCRYPTION_KEY=<independent-random-secret-at-least-32-characters
 
 The origin is exactly HTTPS without trailing slash or path. Mutations require
 the exact browser Origin; missing/null origins and untrusted sibling sites are
-denied. Forwarded host/IP headers do not grant authority. Basic credentials are
-browser-cached; there is no reliable app logout. Use a dedicated browser profile
-and rotate the shared secret when access changes.
-
-Credential-free development is allowed only on loopback. `APP_ORIGIN`, when
-set without credentials, must itself be a loopback origin, and each request URL
-must also use loopback. `npm run dev` binds to `127.0.0.1`; Host/Origin
-validation does not prove the actual socket is locally bound. For an authenticated
-development environment on another HTTPS origin, configure both strong access
-credentials and that exact origin. Never expose credential-free development
-through a tunnel, reverse proxy or a public/all-interface bind.
+denied. Forwarded host/IP headers do not grant authority. Local development can
+use an HTTP loopback origin. `npm run dev` binds to `127.0.0.1` by default.
 
 Configure provider-side hard quotas/budgets where offered and billing alerts
 before enabling generation. Alerts are not hard caps. Review model prices and
-output counts. `GENERATION_ENABLED=false` stops **new** submissions, including
-queued tasks that have not reached their provider, while history,
-downloads and existing task observation remain available. It is a kill switch,
-not a money counter. Reload/redeploy after environment changes.
+output counts. `GENERATION_ENABLED=false` stops new submissions, including queued
+tasks that have not reached their provider, while history, downloads and existing
+task observation remain available. It is a kill switch, not a money counter.
+Reload/redeploy after environment changes.
 
 ## Persistent single process
 
@@ -116,17 +102,17 @@ before submission. Workflow event arguments/results exclude prompts and secrets.
 See [background execution](background-execution.md) for deadlines, retries,
 recovery and costs. Free allowances are finite and AI credits remain separate.
 
-The SDK's generated `/.well-known/workflow/*` queue handlers bypass workspace
-Basic authentication. Preserve this SDK integration and verify delivery with any
+The SDK's generated `/.well-known/workflow/*` queue handlers validate their own
+delivery credentials. Preserve this integration and verify delivery with any
 Deployment Protection settings. `/api/ready` deliberately reports
 `workflow_execution: "unverified"`; validate an actual synthetic run on Vercel.
 
 ### Optional external workers on another host
 
-Keep `TASK_WORKER_MODE=external`, a distinct `CRON_SECRET` and
+Keep `TASK_WORKER_MODE=external`, a random `CRON_SECRET` of 32-256 printable
+non-space ASCII characters and
 `TASK_SCHEDULER_CONFIGURED=true` only when installing a separate recurring
-trigger. `/api/internal/process-tasks` accepts the Bearer scheduler credential,
-not workspace Basic; that credential cannot access the workspace. It rejects
+trigger. `/api/internal/process-tasks` accepts the Bearer scheduler credential. It rejects
 HEAD/query overrides, claims at most ten tasks and has a fifty-second work budget
 under `maxDuration=60`. Generation routes retain `maxDuration=300` and a
 270-second entry budget. Workflow steps have a bounded 240-second work budget.
@@ -218,17 +204,18 @@ Use platform ingress controls against credential guessing and availability abuse
    never print it. Legacy file history is normalized by the new reader. Do not
    bulk-upload old media during startup. Task schema version is now 3; do not
    reapply older migration 0001 after the forward migration.
-3. Configure HTTPS/access and one supported profile. Missing configuration/schema
+3. Configure HTTPS and one supported profile. Missing configuration/schema
    stops startup with `ERR_STARTUP_CONFIGURATION_OR_STORAGE`; there is no open
-   fallback. A production build does not need production credentials.
-4. Verify unauthenticated page, list, generation, events, uploaded-media and
-   download requests are denied, as are cross-origin/missing-Origin mutations.
+   fallback. A production build does not need runtime secrets.
+4. Verify pages, lists, events and media routes load without login. Verify
+   cross-origin/missing-Origin mutations are denied. In demo mode, all workspace
+   writes must be denied, including generation and provider configuration.
    Public `GET /api/health` returns only `{"status":"alive"}`.
-5. Authenticated `/api/ready` validates configuration and performs a current task
+5. `/api/ready` validates configuration and performs a current task
    store read. Workflow mode reports `scheduler_heartbeat:"not_applicable"` and
    `workflow_execution:"unverified"`. Verify a synthetic Workflow on the target
    deployment. For external mode, verify recurring scheduler delivery instead.
-   After switching profiles, POST an empty body to the authenticated
+   After switching profiles, POST an empty body to
    `/api/internal/reconcile-workflows` with exact Origin to arm observers for
    previously accepted tasks (at most 20 per call; follow `nextCursor` via
    `?after=<nextCursor>`). Duplicate runs are safe for
@@ -249,7 +236,7 @@ original request may already be running or charged.
 
 Observation defaults to 24 hours (range 30 minutes to 7 days). Deadline/query failures
 pause observation without asserting provider failure. After repairing the cause,
-authenticated `POST /api/tasks/:id` or `/api/image-tasks/:id` with exact Origin and
+`POST /api/tasks/:id` or `/api/image-tasks/:id` with exact Origin and
 empty body resumes only a paused task with a saved operation; it never repeats
 generation. Unknown submissions without an operation need provider reconciliation.
 Deleting a task fences worker writes but does not cancel provider generation or
@@ -257,20 +244,17 @@ automatically delete media. Tombstone/object retention needs an operator policy.
 
 Rollback first disables generation and stops workers. Preserve the new writer/
 storage contract, or restore matching app/data backups with reconciliation of
-jobs accepted since backup. Do not restore public-access code without an
-independent protected ingress, run old writers against migrated live state or
-delete durable objects merely to roll back code.
+jobs accepted since backup. Do not run old writers against migrated live state
+or delete durable objects merely to roll back code.
 
 ## Official references and local evidence
 
-- [Next.js authentication](https://nextjs.org/docs/app/guides/authentication) and
-  [instrumentation](https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation)
+- [Next.js instrumentation](https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation)
 - [Workflow integration](https://workflow-sdk.dev/docs/getting-started/next),
   [deployment](https://workflow-sdk.dev/docs/deploying),
   [pricing](https://vercel.com/docs/workflows/pricing) and
   [function limits](https://vercel.com/docs/functions/limitations)
-- [HTTP Basic](https://www.rfc-editor.org/rfc/rfc7617.txt) and
-  [OWASP CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [OWASP CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
 - [NGINX limits](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html) and
   [Vercel WAF](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting)
 

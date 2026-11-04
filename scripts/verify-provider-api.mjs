@@ -161,11 +161,11 @@ test("provider health propagates client cancellation and deadlines without chang
     }
 });
 
-test("settings authentication runs before reading bodies or accessing storage", async () => {
+test("settings request policy runs before reading bodies or accessing storage", async () => {
     for (const [file, method] of [...jsonRoutes, ...emptyRoutes]) {
-        const f = fixture({ denial: Response.json({ error: "ERR_UNAUTHORIZED" }, { status: 401 }) });
+        const f = fixture({ denial: Response.json({ error: "ERR_DEMO_READ_ONLY" }, { status: 403 }) });
         const req = request(file, method, { body: "private request bytes" });
-        assert.equal((await f.invoke(file, method, req)).status, 401);
+        assert.equal((await f.invoke(file, method, req)).status, 403);
         assert.equal(req.bodyUsed, false);
         assert.equal(f.calls.reads + f.calls.writes + f.calls.fetch, 0);
     }

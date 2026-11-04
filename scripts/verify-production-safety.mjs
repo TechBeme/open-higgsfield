@@ -14,19 +14,16 @@ const { NextRequest } = require("next/server");
 // The installed Next version retains the Middleware name for this public test helper.
 const { unstable_doesMiddlewareMatch: doesProxyMatch } = require("next/experimental/testing/server");
 const origin = "https://studio.example.test";
-const password = "synthetic-workspace-password-for-local-tests-only";
 const cronSecret = "synthetic-scheduler-secret-for-local-tests-only";
-const basic = `Basic ${Buffer.from(`operator:${password}`).toString("base64")}`;
-const baseEnv = { NODE_ENV: "production", APP_ORIGIN: origin, APP_ACCESS_USER: "operator", APP_ACCESS_PASSWORD: password,
+const baseEnv = { NODE_ENV: "production", APP_ORIGIN: origin,
     DEPLOYMENT_PROFILE: "single-process", TASK_WORKER_MODE: "local", ASSET_STORAGE_MODE: "local",
     OPEN_HIGGSFIELD_STORAGE_DIR: "/tmp/synthetic-workspace-no-real-files" };
 const context = { params: Promise.resolve({ taskId: "synthetic-task", filename: "synthetic.png" }) };
 const caps = { id: "synthetic", provider: "google-ai-studio", media_slots: [], prompt_required: true };
 
 function request(path = "/api/tasks", options = {}) {
-    const { authenticated = true, method = "GET", headers, ...rest } = options;
+    const { method = "GET", headers, ...rest } = options;
     return new NextRequest(`${origin}${path}`, { method, headers: {
-        ...(authenticated ? { authorization: basic } : {}),
         ...(!["GET", "HEAD", "OPTIONS"].includes(method) ? { origin } : {}), ...headers,
     }, ...rest });
 }
@@ -48,11 +45,11 @@ function harness(env = {}, extraMocks = {}, globals = {}) {
     return { calls, ...createModuleLoader({ env: { ...baseEnv, ...env }, mocks, globals }) };
 }
 
-test("Basic access, strict configuration, origin and credential-role boundaries", () => {
+test("workspace access requires no login and retains strict origin checks", () => {
     const access = harness({ CRON_SECRET: cronSecret }).load("@/server/security/workspace-access");
     assert.equal(access.guardWorkspaceRequest(request()), null);
-    for (const authorization of ["", "Basic broken", "Basic !!!", `Basic ${Buffer.from("operator:wrong").toString("base64")}`, `Bearer ${cronSecret}`, "x".repeat(5000)]) {
-        assert.equal(access.guardWorkspaceRequest(request("/api/tasks", { headers: { authorization } })).status, 401);
+    for (const path of ["/en", "/pt-BR/settings", "/api/providers", "/api/tasks"]) {
+        assert.equal(access.guardWorkspaceRequest(request(path)), null);
     }
     for (const suppliedOrigin of ["", "null", "https://evil.test", `${origin}.evil.test`]) {
         const response = access.guardWorkspaceRequest(request("/api/tasks/id", { method: "DELETE", headers: {
@@ -68,26 +65,26 @@ test("Basic access, strict configuration, origin and credential-role boundaries"
     assert.equal(access.guardWorkspaceRequest(request("/api/tasks/id", { method: "POST", headers: { "sec-fetch-site": "same-origin" } })), null);
     assert.equal(access.guardSchedulerRequest(request("/api/internal/process-tasks")).status, 401);
     assert.equal(access.guardSchedulerRequest(request("/api/internal/process-tasks", { headers: { authorization: `Bearer ${cronSecret}` } })), null);
-    for (const env of [{ APP_ACCESS_PASSWORD: undefined }, { APP_ACCESS_PASSWORD: "short" }, { APP_ACCESS_USER: "bad:user" },
-        { APP_ORIGIN: undefined }, { APP_ORIGIN: "http://localhost:3000" }, { APP_ORIGIN: `${origin}/` }, { APP_ORIGIN: `${origin}/path` }]) {
+    for (const env of [{ APP_ORIGIN: undefined }, { APP_ORIGIN: "http://localhost:3000" },
+        { APP_ORIGIN: `${origin}/` }, { APP_ORIGIN: `${origin}/path` }]) {
         assert.equal(harness(env).load("@/server/security/workspace-access").guardWorkspaceRequest(request()).status, 503);
     }
-    const development = harness({ NODE_ENV: "development", APP_ORIGIN: undefined, APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined }).load("@/server/security/workspace-access");
+    const development = harness({ NODE_ENV: "development", APP_ORIGIN: undefined }).load("@/server/security/workspace-access");
     assert.equal(development.guardWorkspaceRequest(new Request("http://localhost:3000/api/tasks")), null);
-    assert.equal(development.guardWorkspaceRequest(new Request("http://example.test/api/tasks")).status, 403);
+    assert.equal(development.guardWorkspaceRequest(new Request("http://example.test/api/tasks")), null);
 });
 
 test("public demo serves pages without credentials and rejects writes before downstream work", async () => {
-    const env = { APP_DEMO_MODE: "true", GENERATION_ENABLED: "false", APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined };
+    const env = { APP_DEMO_MODE: "true", GENERATION_ENABLED: "false" };
     const h = harness(env);
     const access = h.load("@/server/security/workspace-access");
     const { default: proxy } = h.load("src/proxy.ts");
     for (const path of ["/en", "/pt-BR/settings", "/es", "/icon.svg", "/api/providers", "/api/catalog", "/api/image-models"]) {
-        const response = proxy(request(path, { authenticated: false }));
+        const response = proxy(request(path, {}));
         assert.notEqual(response.status, 401, path);
         assert.notEqual(response.status, 503, path);
         assert.equal(response.headers.get("www-authenticate"), null, path);
-        assert.equal(access.guardWorkspaceRequest(request(path, { authenticated: false })), null);
+        assert.equal(access.guardWorkspaceRequest(request(path, {})), null);
     }
     for (const [path, method] of [["generate", "POST"], ["generate-image", "POST"], ["providers", "POST"],
         ["providers/[id]", "PATCH"], ["providers/[id]", "DELETE"], ["providers/[id]/test", "POST"],
@@ -95,15 +92,12 @@ test("public demo serves pages without credentials and rejects writes before dow
         ["gallery", "PATCH"], ["save-to-gallery", "POST"], ["tasks/[taskId]", "DELETE"],
         ["internal/reconcile-workflows", "POST"]]) {
         const route = h.load(`src/app/api/${path}/route.ts`);
-        const response = await route[method](request(`/api/${path}`, { method, authenticated: false, body: "unparsed fixture" }), context);
+        const response = await route[method](request(`/api/${path}`, { method, body: "unparsed fixture" }), context);
         assert.equal(response.status, 403, `${method} ${path}`);
         assert.equal((await response.json()).error, "ERR_DEMO_READ_ONLY");
         assert.equal(response.headers.get("www-authenticate"), null);
     }
     assert.equal(h.calls.store + h.calls.submit + h.calls.uploads + h.calls.config + h.calls.worker, 0);
-    // Cached operator credentials cannot bypass read-only mode.
-    assert.equal(harness({ ...env, APP_ACCESS_USER: "operator", APP_ACCESS_PASSWORD: password })
-        .load("@/server/security/workspace-access").guardWorkspaceRequest(request("/api/providers", { method: "POST" })).status, 403);
     assert.throws(() => h.load("@/server/config/production").assertGenerationEnabled(), /ERR_GENERATION_DISABLED/);
 });
 
@@ -111,16 +105,16 @@ test("demo mode fails closed if generation is enabled or demo configuration is i
     for (const env of [{ APP_DEMO_MODE: "true", GENERATION_ENABLED: "true" }, { APP_DEMO_MODE: "true", GENERATION_ENABLED: undefined },
         { APP_DEMO_MODE: "typo" }, { APP_DEMO_MODE: "true", GENERATION_ENABLED: "false", APP_ORIGIN: undefined }]) {
         const access = harness(env).load("@/server/security/workspace-access");
-        assert.equal(access.guardWorkspaceRequest(request("/en", { authenticated: false })).status, 503);
+        assert.equal(access.guardWorkspaceRequest(request("/en", {})).status, 503);
     }
 });
 
 test("actual proxy covers APIs with extensions, image optimization and locale routing without scheduler redirects", () => {
     const loader = harness({ CRON_SECRET: cronSecret });
     const { default: proxy, config } = loader.load("src/proxy.ts");
-    for (const path of ["/", "/en", "/pt-BR", "/es", "/es/settings", "/es/manifest.webmanifest", "/api/generate", "/api/uploaded/file.png", "/api/download/task.id", "/_next/image?url=private", "/api/internal/process-tasks"]) {
+    for (const path of ["/", "/en", "/pt-BR", "/es", "/es/settings", "/es/manifest.webmanifest", "/api/generate", "/api/uploaded/file.png", "/api/download/task.id", "/_next/image?url=private"]) {
         assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}${path}` }), true, path);
-        assert.equal(proxy(request(path, { authenticated: false })).status, 401, path);
+        assert.ok(proxy(request(path)).status < 400, path);
     }
     assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}/_next/static/chunks/app.js` }), false);
     assert.equal(doesProxyMatch({ config, nextConfig: {}, url: `${origin}/.well-known/workflow/v1/flow` }), false);
@@ -131,49 +125,32 @@ test("actual proxy covers APIs with extensions, image optimization and locale ro
     assert.equal(localized.status, 307);
     assert.match(localized.headers.get("location"), /\/pt-BR$/);
     assert.equal(localized.headers.get("cache-control"), "private, no-store");
-    assert.match(localized.headers.get("vary"), /Authorization/);
-    assert.equal(proxy(request("/api/health", { authenticated: false })).headers.get("x-middleware-next"), "1");
+    assert.match(localized.headers.get("vary"), /Origin/);
+    assert.equal(proxy(request("/api/health", {})).headers.get("x-middleware-next"), "1");
     const scheduler = proxy(request("/api/internal/process-tasks", { headers: { authorization: `Bearer ${cronSecret}` } }));
     assert.equal(scheduler.headers.get("x-middleware-next"), "1");
     assert.equal(scheduler.headers.get("location"), null);
 });
 
-test("credential-free development requires loopback configuration and request even with APP_ORIGIN set", async () => {
-    const localOrigins = ["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000", "https://localhost:3443"];
-    for (const configuredOrigin of [undefined, ...localOrigins, origin]) {
-        const h = harness({ NODE_ENV: "development", APP_ORIGIN: configuredOrigin, APP_ACCESS_USER: undefined, APP_ACCESS_PASSWORD: undefined });
-        const access = h.load("@/server/security/workspace-access");
-        for (const requestOrigin of [...localOrigins, origin]) {
-            for (const method of ["GET", "POST"]) {
-                const candidate = new Request(`${requestOrigin}/api/tasks`, { method, headers: { origin: configuredOrigin ?? requestOrigin } });
-                const rejection = access.guardWorkspaceRequest(candidate);
-                const expected = configuredOrigin === origin ? 503 : requestOrigin === origin ? 403 : null;
-                assert.equal(rejection?.status ?? null, expected, `${configuredOrigin} ${requestOrigin} ${method}`);
-            }
+test("development supports configured origins and validates write origins without a login", () => {
+    for (const configuredOrigin of [undefined, "http://localhost:3000", origin]) {
+        const access = harness({ NODE_ENV: "development", APP_ORIGIN: configuredOrigin }).load("@/server/security/workspace-access");
+        for (const requestOrigin of ["http://localhost:3000", origin]) {
+            assert.equal(access.guardWorkspaceRequest(new Request(`${requestOrigin}/api/tasks`)), null);
+            const write = new Request(`${requestOrigin}/api/tasks`, { method: "POST", headers: { origin: configuredOrigin ?? requestOrigin } });
+            assert.equal(access.guardWorkspaceRequest(write), null);
         }
-        const handlerResponse = await h.load("src/app/api/tasks/route.ts").GET(new NextRequest(`${origin}/api/tasks`));
-        assert.equal(handlerResponse.status, configuredOrigin === origin ? 503 : 403);
-        assert.equal(h.calls.store, 0);
     }
-    const authenticated = harness({ NODE_ENV: "development" }).load("@/server/security/workspace-access");
-    assert.equal(authenticated.guardWorkspaceRequest(request()), null);
-    assert.equal(authenticated.guardWorkspaceRequest(request("/api/tasks", { method: "POST" })), null);
-    assert.equal(authenticated.guardWorkspaceRequest(request("/api/tasks", { authenticated: false })).status, 401);
 });
 
-test("every real protected route denies unauthorized requests before downstream work", async () => {
-    const paths = [
-        ["generate", "POST"], ["generate-image", "POST"], ["tasks", "GET"], ["image-tasks", "GET"], ["gallery", "PATCH"],
-        ["tasks/[taskId]", "GET"], ["tasks/[taskId]", "POST"], ["tasks/[taskId]", "DELETE"],
-        ["image-tasks/[taskId]", "GET"], ["image-tasks/[taskId]", "POST"], ["image-tasks/[taskId]", "DELETE"],
-        ["events/[taskId]", "GET"], ["download/[taskId]", "GET"], ["uploaded/[filename]", "GET"],
-        ["internal/reconcile-workflows", "POST"], ["save-to-gallery", "POST"], ["models", "GET"], ["image-models", "GET"], ["ready", "GET"],
-    ];
-    for (const [path, method] of paths) {
+test("write routes reject foreign origins before downstream work", async () => {
+    for (const [path, method] of [["generate", "POST"], ["generate-image", "POST"], ["gallery", "PATCH"],
+        ["tasks/[taskId]", "POST"], ["tasks/[taskId]", "DELETE"], ["image-tasks/[taskId]", "POST"],
+        ["image-tasks/[taskId]", "DELETE"], ["internal/reconcile-workflows", "POST"], ["save-to-gallery", "POST"]]) {
         const h = harness();
         const route = h.load(`src/app/api/${path}/route.ts`);
-        const response = await route[method](request(`/api/${path}`, { method, authenticated: false }), context);
-        assert.equal(response.status, 401, `${method} ${path}`);
+        const response = await route[method](request(`/api/${path}`, { method, headers: { origin: "https://evil.test" } }), context);
+        assert.equal(response.status, 403, `${method} ${path}`);
         assert.equal(response.headers.get("cache-control"), "private, no-store");
         assert.equal(h.calls.store + h.calls.submit + h.calls.uploads + h.calls.config + h.calls.worker, 0, path);
     }
@@ -199,7 +176,7 @@ test("deployment profile rejects ephemeral/file and unconfigured external execut
     for (const env of [{ DEPLOYMENT_PROFILE: undefined }, { DEPLOYMENT_PROFILE: "distributed" }, { VERCEL: "1" },
         { TASK_WORKER_MODE: "external" }, { TASK_WORKER_MODE: "bad" }, { TASK_OBSERVATION_TIMEOUT_MS: "2" },
         { GENERATION_ENABLED: "yes" }, { DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external", CRON_SECRET: cronSecret },
-        { DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external", CRON_SECRET: password, TASK_SCHEDULER_CONFIGURED: "true" }]) {
+        { DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external", CRON_SECRET: "short", TASK_SCHEDULER_CONFIGURED: "true" }]) {
         assert.throws(() => harness(env).load("@/server/config/production").assertRuntimeConfiguration(), /ERR_/);
     }
     const config = harness({ VERCEL: "1", DEPLOYMENT_PROFILE: "distributed", DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external",
@@ -349,7 +326,7 @@ test("startup is once per Node instance, skips builds/Edge and external mode nev
     const external = harness({ NEXT_RUNTIME: "nodejs", DATABASE_URL: "synthetic", TASK_WORKER_MODE: "external", TASK_SCHEDULER_CONFIGURED: "true", CRON_SECRET: cronSecret });
     await external.load("src/instrumentation.ts").register();
     assert.equal(external.calls.store, 1); assert.equal(external.calls.start, 0);
-    await assert.rejects(harness({ NEXT_RUNTIME: "nodejs", APP_ACCESS_PASSWORD: undefined }).load("src/instrumentation.ts").register(), /ERR_STARTUP_CONFIGURATION_OR_STORAGE/);
+    await assert.rejects(harness({ NEXT_RUNTIME: "nodejs", APP_ORIGIN: undefined }).load("src/instrumentation.ts").register(), /ERR_STARTUP_CONFIGURATION_OR_STORAGE/);
     const storageFailure = harness({ NEXT_RUNTIME: "nodejs" }, { "@/server/tasks/store": { initStore() { throw new Error("private database error"); } } });
     await assert.rejects(storageFailure.load("src/instrumentation.ts").register(), /^Error: ERR_STARTUP_CONFIGURATION_OR_STORAGE$/);
     const readiness = await external.load("src/app/api/ready/route.ts").GET(request("/api/ready"));
@@ -391,7 +368,7 @@ test("Workflow production requires the Vercel world and readiness does not claim
     assert.equal(result.workflow_execution, "unverified");
 });
 
-test("Workflow recovery is operator-only, bounded, paginates and redacts infrastructure failures", async () => {
+test("Workflow recovery validates origin, bounds pagination and redacts infrastructure failures", async () => {
     const ids = Array.from({ length: 20 }, (_, i) => `synthetic-task-${String(i).padStart(2, "0")}`);
     let scans = 0; let starts = 0; let cursor;
     const env = { VERCEL: "1", VERCEL_DEPLOYMENT_ID: "synthetic-deployment", DEPLOYMENT_PROFILE: "distributed",
@@ -402,9 +379,6 @@ test("Workflow recovery is operator-only, bounded, paginates and redacts infrast
     };
     const h = harness(env, mocks);
     const route = h.load("src/app/api/internal/reconcile-workflows/route.ts");
-    for (const authorization of ["", `Bearer ${cronSecret}`]) {
-        assert.equal((await route.POST(request("/api/internal/reconcile-workflows", { method: "POST", headers: { authorization } }))).status, 401);
-    }
     assert.equal((await route.POST(request("/api/internal/reconcile-workflows", { method: "POST", headers: { origin: "https://evil.test" } }))).status, 403);
     assert.equal((await route.POST(request("/api/internal/reconcile-workflows", { method: "POST", body: "{}" }))).status, 400);
     for (const query of ["?limit=50", "?after=", "?after=x&after=y", "?after=bad%2Fid"]) {

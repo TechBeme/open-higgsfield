@@ -15,7 +15,6 @@ export default defineConfig({
     use: {
         baseURL,
         ignoreHTTPSErrors: true,
-        httpCredentials: { username: "e2e-local", password: "synthetic-e2e-workspace-password-32-characters" },
         trace: "retain-on-failure",
         screenshot: "only-on-failure",
     },

@@ -143,7 +143,7 @@ try {
         NODE_ENV: production ? "production" : "development", NEXT_TELEMETRY_DISABLED: "1",
         HOSTNAME: "127.0.0.1", PORT: "3111",
         E2E_TEST_SERVER: "1", E2E_PRODUCTION: production ? "1" : "0",
-        APP_ORIGIN: origin, APP_ACCESS_USER: "e2e-local", APP_ACCESS_PASSWORD: "synthetic-e2e-workspace-password-32-characters",
+        APP_ORIGIN: origin, APP_DEMO_MODE: "false",
         PROVIDER_CONFIG_ENCRYPTION_KEY: "synthetic-e2e-encryption-key-32-characters",
         OPEN_HIGGSFIELD_STORAGE_DIR: path.join(temporary, "storage"), GENERATION_ENABLED: "false",
         DEPLOYMENT_PROFILE: "single-process", TASK_WORKER_MODE: "local", TASK_OBSERVATION_TIMEOUT_MS: "86400000",

@@ -6,6 +6,17 @@ import es from "../../src/messages/es.json";
 
 const messages = { en, "pt-BR": pt, es };
 
+test("pages and settings APIs open without login or a browser password challenge", async ({ request }) => {
+    for (const path of ["/en", "/pt-BR/settings", "/es", "/api/providers", "/api/catalog", "/icon.svg"]) {
+        const response = await request.get(path);
+        expect(response.status(), path).toBe(200);
+        expect(response.headers()["www-authenticate"], path).toBeUndefined();
+    }
+    const disabled = await request.post("/api/generate-image", { headers: { Origin: "https://127.0.0.1:3110" } });
+    expect(disabled.status()).toBe(503);
+    expect(await disabled.json()).toMatchObject({ error: "ERR_GENERATION_DISABLED" });
+});
+
 for (const [locale, m] of Object.entries(messages)) {
     test(`${locale}: hydration, empty Studio, navigation and accessibility`, async ({ page }, testInfo) => {
         await mockWorkspace(page, { connected: false });
