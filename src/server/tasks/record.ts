@@ -1,11 +1,15 @@
 import "server-only";
 
 import type { AnyTask, TaskEvent, TaskPhase } from "@/types";
+import type { CanonicalMediaInputs } from "@/models/canonical";
 import { safeErrorCode } from "@/server/tasks/runtime";
 import { galleryTaskRank } from "@/lib/gallery";
 
 
 export type TaskRecord = AnyTask & {
+    /** Private queued request; never included in public DTOs or Workflow arguments. */
+    submission_media?: CanonicalMediaInputs;
+    submission_ready?: boolean;
     revision: number;
     lifecycle_phase: TaskPhase;
     next_poll_at: string | null;
@@ -160,7 +164,7 @@ export function makePage(rows: AnyTask[], limit: number): TaskPage {
 }
 
 export function isDue(task: TaskRecord, now: number): boolean {
-    return !task.deleted_at && !STOPPED.has(task.lifecycle_phase) && Boolean(task.next_poll_at) &&
+    return !task.deleted_at && !STOPPED.has(task.lifecycle_phase) && (task.lifecycle_phase !== "queued" || task.submission_ready === true) && Boolean(task.next_poll_at) &&
         Date.parse(task.next_poll_at!) <= now && (!task.lease_expires_at || Date.parse(task.lease_expires_at) <= now);
 }
 

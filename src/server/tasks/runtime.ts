@@ -13,10 +13,16 @@ export function observationDeadline(now = Date.now()): string {
     return new Date(now + value).toISOString();
 }
 
+export type TaskWorkerMode = "local" | "external" | "workflow";
+
+export function taskWorkerMode(): TaskWorkerMode {
+    const mode = process.env.TASK_WORKER_MODE ?? (process.env.VERCEL ? "workflow" : "local");
+    if (mode !== "local" && mode !== "external" && mode !== "workflow") throw new Error("ERR_TASK_CONFIG");
+    return mode;
+}
+
 export function localWorkerEnabled(): boolean {
-    const mode = process.env.TASK_WORKER_MODE ?? (process.env.VERCEL ? "external" : "local");
-    if (mode !== "local" && mode !== "external") throw new Error("ERR_TASK_CONFIG");
-    return mode === "local" && process.env.NEXT_PHASE !== "phase-production-build";
+    return taskWorkerMode() === "local" && process.env.NEXT_PHASE !== "phase-production-build";
 }
 
 export function boundedSignal(timeout: number, parent?: AbortSignal): AbortSignal {

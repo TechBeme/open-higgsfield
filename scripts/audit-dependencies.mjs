@@ -7,7 +7,6 @@ const EXPIRY = "2026-12-01T00:00:00.000Z";
 const ACCEPTED_GHSA = "GHSA-g3hv-75wg-m249";
 const ACCEPTED_URL = `https://github.com/advisories/${ACCEPTED_GHSA}`;
 const ACCEPTED_PATHS = new Map([
-  ["node_modules/minimatch", "3.1.5"],
   ["node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch", "10.2.4"],
 ]);
 const SEVERITIES = ["info", "low", "moderate", "high", "critical"];
@@ -53,8 +52,8 @@ function validateNode(path, name, lockPackages) {
 
 function isAcceptedAdvisory(value) {
   return isRecord(value) && value.name === "minimatch" && value.dependency === "minimatch"
-    && value.url === ACCEPTED_URL && value.severity === "moderate" && value.range === "<11.0.1"
-    && (value.source === undefined || value.source === 1244012);
+    && value.url === ACCEPTED_URL && value.severity === "moderate" && value.range === ">=7.0.0 <11.0.1"
+    && (value.source === undefined || value.source === 1244623);
 }
 
 function auditAdvisory(value) {

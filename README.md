@@ -8,7 +8,7 @@
   Generate with Magnific, Google AI Studio, Google Vertex AI, Vercel AI Gateway, ToAPIs, and Runware models from one focused creative studio.
 
   <p>
-    <a href="https://openhiggs.techbe.me"><strong>Live Demo</strong></a>
+    <a href="https://openhiggs.techbe.me"><strong>UI Preview</strong></a>
     |
     <a href="#why-open-higgsfield">Features</a>
     |
@@ -33,6 +33,8 @@
     <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTechBeme%2Fopen-higgsfield"><img alt="Deploy with Vercel" src="https://vercel.com/button" /></a>
   </p>
 </div>
+
+The hosted site is an interface preview; generation may be disabled. To generate images and videos, run your own installation and connect your provider accounts.
 
 ![Open-Higgsfield Studio in English](docs/images/open-higgsfield-studio-en.png)
 
@@ -134,7 +136,7 @@ See [Providers and models](docs/providers.md) for credentials, provider behavior
 - SWR for client data and next-intl for English, Brazilian Portuguese, and Spanish
 - Capability-driven model catalog and provider-neutral generation contracts
 - Magnific API, Google Gen AI SDK, Vertex AI, Vercel AI Gateway, ToAPIs, and Runware
-- Cloudinary handoff for workflows that require public reference-media URLs
+- Private Vercel Blob/S3 media and signed reference URLs; legacy Cloudinary support
 - PostgreSQL/Neon task history, or an explicit single-process local store
 
 ## Architecture
@@ -171,7 +173,7 @@ See [Architecture](docs/architecture.md) for the complete request lifecycle and 
 - Node.js 22.23.4 or newer within the Node 22 release line
 - npm 10+
 - At least one supported provider credential
-- Cloudinary credentials only when a workflow requires public reference-media URLs
+- For distributed deployments: Vercel Blob or S3 credentials for durable media/reference uploads; legacy Cloudinary is optional
 
 ### 1. Clone and install
 
@@ -237,8 +239,10 @@ TOAPIS_API_KEY=
 # Runware
 RUNWARE_API_KEY=
 
-# Reference-media uploads
-CLOUDINARY_URL=
+# Optional durable media and reference uploads (private Blob store)
+# ASSET_STORAGE_MODE=vercel-blob
+# ASSET_DELIVERY_MODE=private
+# BLOB_READ_WRITE_TOKEN=
 ```
 
 Never use `NEXT_PUBLIC_` for provider credentials. Open-Higgsfield reads them only from server-side modules.
@@ -257,17 +261,18 @@ Configure the production access and single-process profile from the [operator gu
 
 ## Deploy on Vercel
 
-Production requires an operator credential, an HTTPS origin, migrated PostgreSQL task storage, explicitly public Cloudinary outputs and recurring execution. The included minute cron requires **Vercel Pro or Enterprise**. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
+Production requires an operator credential, an HTTPS origin, migrated PostgreSQL task storage, durable Vercel Blob or S3 media storage and **Vercel Workflows** for background submission, observation and media storage. No minute Cron or GitHub scheduler is required. See [background execution](docs/background-execution.md) for configuration and usage costs. New generation stays disabled until `GENERATION_ENABLED=true` is explicitly configured.
 
 Each deployment is one operator-owned BYOK workspace. There are no per-user
 ownership boundaries, application monetary budgets or global rate limits; if the
 operator shares the URL, every visitor uses that deployment's credentials and
 quota. Configure provider quotas/budgets and ingress controls before enabling
-work. Cloudinary media remains public by URL.
+work. Blob/S3 originals default to private, with expiring links for display and
+provider references. See the [storage guide](docs/storage.md).
 
-Follow the [production operator guide](docs/production.md) for configuration, migration, scheduler verification and rollback before deploying.
+Follow the [production operator guide](docs/production.md) for configuration, migration, Workflow verification and rollback before deploying.
 
-Updating an existing deployment? See the [Vercel update checklist](docs/deployment.md#updating-an-existing-vercel-deployment) for Git integration, environment settings, migrations, and verification. These gallery and mobile layout changes add no new environment variables or database migrations.
+Updating an existing deployment? See the [Vercel update checklist](docs/deployment.md#updating-an-existing-vercel-deployment) for Git integration, environment settings, migrations, and verification. This update requires migration `0003_workflow_queue.sql` and the Workflow execution profile; follow the checklist before deploying.
 
 ## Commands
 

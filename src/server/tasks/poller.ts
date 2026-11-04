@@ -1,7 +1,7 @@
 import "server-only";
 
 import { isProviderId } from "@/providers/definitions";
-/** Durable polling: each invocation claims current storage state and never submits generation. */
+/** Claims current state; only activated queued tasks may submit, and only once. */
 import { randomUUID } from "node:crypto";
 import { attachGeneratedAssets } from "@/server/media/generated-assets";
 import { claimTask, updateTask, type TaskRecord } from "@/server/tasks/store";
@@ -10,6 +10,8 @@ import { ASSET_TIMEOUT_MS, boundedSignal, localWorkerEnabled, POLL_TIMEOUT_MS, q
     safeErrorCode, withSignal, WORKER_LEASE_MS } from "@/server/tasks/runtime";
 import { getProvider } from "@/server/providers/registry";
 import { connectionFromEnv, getProviderConnection } from "@/server/config/provider-store";
+import { submitQueuedTask } from "@/server/generation/queued-submission";
+import { SUBMISSION_LEASE_MS, taskWorkerMode } from "@/server/tasks/runtime";
 
 async function persist(task: TaskRecord, signal: AbortSignal, releaseLease = true) {
     return withSignal(signal, () => updateTask(task, { signal, releaseLease }));
@@ -22,6 +24,7 @@ async function pause(task: TaskRecord, code: string, signal: AbortSignal, unknow
 
 async function processClaim(task: TaskRecord, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted();
+    if (task.lifecycle_phase === "queued") return submitQueuedTask(task, signal);
     if (task.lifecycle_phase === "submitting") return pause(task, "ERR_SUBMISSION_OUTCOME_UNKNOWN", signal, true);
     if (!hasOperation(task)) return pause(task, "ERR_ASSET_STORAGE_INCOMPLETE", signal);
     if (task.deadline_at && Date.parse(task.deadline_at) <= Date.now()) return pause(task, "ERR_POLLING_PAUSED_UPSTREAM_STATUS_UNKNOWN", signal);
@@ -87,11 +90,11 @@ export async function processDueTasks(options: { limit?: number; budgetMs?: numb
     const result = { claimed: 0, processed: 0 };
     while (result.claimed < limit && deadline - Date.now() > 500) {
         let task: TaskRecord | undefined;
-        try { task = await withSignal(signal, () => claimTask(randomUUID(), WORKER_LEASE_MS, options.taskId, { signal })); }
+        try { task = await withSignal(signal, () => claimTask(randomUUID(), taskWorkerMode() === "workflow" ? SUBMISSION_LEASE_MS : WORKER_LEASE_MS, options.taskId, { signal })); }
         catch (error) { if (signal.aborted) break; throw error; }
         if (!task) break;
         result.claimed++;
-        try { await processClaim(task, boundedSignal(90_000, signal)); }
+        try { await processClaim(task, boundedSignal(task.lifecycle_phase === "queued" ? 235_000 : 90_000, signal)); }
         catch (error) {
             if (signal.aborted) break;
             console.error("[task-worker] task processing deferred", { task_id: task.task_id, code: safeErrorCode(error, "ERR_TASK_STORAGE_UNAVAILABLE") });

@@ -6,12 +6,12 @@ import { randomUUID } from "node:crypto";
 import type { AnyTask, MediaType } from "@/types";
 import { STORAGE_ROOT } from "@/server/config/storage-paths";
 import { claimPersistedTask, createPersistedTask, deletePersistedTask, ensureTaskSchema, isDatabaseConfigured,
-    listPersistedTasks, readPersistedTask, readPublicPersistedTask, updatePersistedTask, applyPersistedGallery, readGalleryTasks } from "@/server/tasks/postgres";
+    listPersistedTasks, readPersistedTask, readPublicPersistedTask, updatePersistedTask, applyPersistedGallery, readGalleryTasks, workflowCandidateIds } from "@/server/tasks/postgres";
 import { galleryPatches } from "./gallery";
 import type { GalleryAction, GalleryReference } from "@/lib/gallery";
 import { compareTaskOrder, hasOperation, isDue, makePage, normalizeTask, pageOptions, publicTask,
     type NewTaskRecord, type TaskPage, type TaskRecord } from "@/server/tasks/record";
-import { observationDeadline, withSignal } from "@/server/tasks/runtime";
+import { observationDeadline, taskWorkerMode, withSignal } from "@/server/tasks/runtime";
 
 export type { TaskRecord, NewTaskRecord } from "@/server/tasks/record";
 const TASKS_FILE = path.join(STORAGE_ROOT, "tasks_history.json");
@@ -101,6 +101,15 @@ export async function getPublicTask(id: string): Promise<AnyTask | undefined> {
     return task ? publicTask(task) : undefined;
 }
 
+/** Explicit operator recovery only; unactivated requests are never selected. */
+export async function listWorkflowCandidateIds(after?: string): Promise<string[]> {
+    if (isDatabaseConfigured()) return workflowCandidateIds(after);
+    await file.queue; await initFile();
+    return [...file.rows.values()].filter(task => !task.deleted_at && ["queued", "submitting", "polling", "materializing"].includes(task.lifecycle_phase)
+        && (task.lifecycle_phase !== "queued" || task.submission_ready === true) && (!after || task.task_id > after))
+        .sort((a, b) => a.task_id < b.task_id ? -1 : a.task_id > b.task_id ? 1 : 0).slice(0, 20).map(task => task.task_id);
+}
+
 export async function createTask(task: NewTaskRecord, options: { signal?: AbortSignal } = {}): Promise<TaskRecord> {
     if (isDatabaseConfigured()) return createPersistedTask(task, options.signal);
     return (await mutateFile((rows) => {
@@ -185,7 +194,12 @@ export async function resumeTask(id: string): Promise<"resumed" | "missing" | "c
     const task = await getTask(id);
     if (!task) return "missing";
     if (task.lifecycle_phase !== "paused" || !hasOperation(task)) return "conflict";
+    const deadline_at = observationDeadline();
+    if (taskWorkerMode() === "workflow") {
+        const { startTaskWorkflow } = await import("./workflow-dispatch");
+        await startTaskWorkflow({ ...task, deadline_at }, { minimumRevision: task.revision + 1 });
+    }
     const updated = await updateTask({ ...task, lifecycle_phase: "polling", status: "IN_PROGRESS", freepik_status: "IN_PROGRESS",
-        next_poll_at: new Date().toISOString(), deadline_at: observationDeadline(), poll_failures: 0, error_message: undefined });
+        next_poll_at: new Date().toISOString(), deadline_at, poll_failures: 0, error_message: undefined });
     return updated ? "resumed" : "conflict";
 }

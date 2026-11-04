@@ -7,10 +7,9 @@ and delete every task and use the configured provider accounts. There are no
 individual accounts, ownership boundaries, application monetary budgets or
 global request rate limits. Public multi-user service is unsupported.
 
-Cloudinary outputs and uploaded provider references are **public by URL**. App
-authentication does not make CDN originals private. Local generated outputs
-remain behind the app credential, but reference uploads required by a provider
-still use public Cloudinary delivery. See [storage](storage.md).
+Vercel Blob and S3 default to private originals with expiring, scoped links for
+browsers and AI providers. Legacy Cloudinary originals remain **public by URL**;
+app authentication does not make that CDN private. See [storage](storage.md).
 
 ## Common configuration
 
@@ -46,7 +45,8 @@ through a tunnel, reverse proxy or a public/all-interface bind.
 
 Configure provider-side hard quotas/budgets where offered and billing alerts
 before enabling generation. Alerts are not hard caps. Review model prices and
-output counts. `GENERATION_ENABLED=false` stops **new** submissions while history,
+output counts. `GENERATION_ENABLED=false` stops **new** submissions, including
+queued tasks that have not reached their provider, while history,
 downloads and existing task observation remain available. It is a kill switch,
 not a money counter. Reload/redeploy after environment changes.
 
@@ -62,8 +62,8 @@ OPEN_HIGGSFIELD_STORAGE_DIR=/app/data
 Leave `DATABASE_URL` unset for local task history. Mount a persistent disk at
 the absolute path and run exactly one Node process: no PM2 cluster, multiple
 containers, replicas or ephemeral volume. Configuration cannot prove a durable
-mount. PostgreSQL, even on one server, requires Cloudinary outputs under T4's
-storage contract.
+mount. PostgreSQL, even on one server, requires durable object storage (Blob, S3 or
+legacy Cloudinary).
 
 Startup validates configuration/store and starts the ten-second local observer.
 A supervisor must restart the process after failure. Restart reloads due tasks
@@ -77,33 +77,48 @@ Set the common settings and:
 
 ```dotenv
 DEPLOYMENT_PROFILE=distributed
-TASK_WORKER_MODE=external
+TASK_WORKER_MODE=workflow
 DATABASE_URL=<postgresql-or-neon-connection-string>
-ASSET_STORAGE_MODE=cloudinary
-ASSET_DELIVERY_MODE=public
-CLOUDINARY_URL=<cloudinary-account-credentials>
-CRON_SECRET=<different-random-secret-at-least-32-characters>
-TASK_SCHEDULER_CONFIGURED=true
+ASSET_STORAGE_MODE=vercel-blob
+ASSET_DELIVERY_MODE=private
+BLOB_READ_WRITE_TOKEN=<connected-private-blob-store-token>
 ```
 
-Cloudinary may instead use the three credential variables in `.env.example`.
+S3 is also supported; see [media storage](storage.md) for settings and credentials.
 Vercel rejects local file/asset/worker profiles. PostgreSQL is authoritative with
 no file fallback or runtime DDL. Apply the explicit migration before starting.
 
-Root `vercel.json` schedules `GET /api/internal/process-tasks` every minute.
-**Vercel Pro or Enterprise is required**; Hobby supports daily cron only.
-Vercel automatically sends `Authorization: Bearer $CRON_SECRET`. Basic cannot
-run this endpoint, and the scheduler secret cannot access the workspace. The
-endpoint rejects HEAD and query overrides, claims at most ten tasks and uses a
-fifty-second work budget under `maxDuration=60`. Generation routes use `maxDuration=300`
-and a 270-second request-entry budget.
+Enable Fluid compute and access to System Environment Variables in the Vercel
+project settings; the SDK needs `VERCEL_DEPLOYMENT_ID` to select its Vercel World.
+The application rejects non-Vercel Workflow targets in production. Next config
+uses the official `withWorkflow` plugin. No minute Cron, GitHub scheduler,
+`CRON_SECRET` or `TASK_SCHEDULER_CONFIGURED` is required for this profile.
 
-`TASK_SCHEDULER_CONFIGURED=true` is an operator declaration, not proof of delivery.
-Observe successful recurring invocations before enabling generation. Cron may
-miss/duplicate/overlap calls and does not retry failures. Persisted schedules and
-leases let later calls recover without paid resubmission. Next `after` or process
-timers alone do not provide serverless recovery. If enabling Vercel Deployment
-Protection, explicitly verify the cron still reaches its handler.
+The request saves an inactive queued task, waits for durable Workflow admission,
+then activates it and returns HTTP 202. The Workflow submits once, observes the
+saved operation and stores outputs after the browser closes. SQL leases and
+revisions fence duplicate delivery. Unknown submission outcomes are never
+resubmitted automatically. Inputs use stable media routes; signing happens just
+before submission. Workflow event arguments/results exclude prompts and secrets.
+See [background execution](background-execution.md) for deadlines, retries,
+recovery and costs. Free allowances are finite and AI credits remain separate.
+
+The SDK's generated `/.well-known/workflow/*` queue handlers bypass workspace
+Basic authentication. Preserve this SDK integration and verify delivery with any
+Deployment Protection settings. `/api/ready` deliberately reports
+`workflow_execution: "unverified"`; validate an actual synthetic run on Vercel.
+
+### Optional external workers on another host
+
+Keep `TASK_WORKER_MODE=external`, a distinct `CRON_SECRET` and
+`TASK_SCHEDULER_CONFIGURED=true` only when installing a separate recurring
+trigger. `/api/internal/process-tasks` accepts the Bearer scheduler credential,
+not workspace Basic; that credential cannot access the workspace. It rejects
+HEAD/query overrides, claims at most ten tasks and has a fifty-second work budget
+under `maxDuration=60`. Generation routes retain `maxDuration=300` and a
+270-second entry budget. Workflow steps have a bounded 240-second work budget.
+The declaration does not prove recurring delivery. Timers/Next `after` alone do
+not provide durable serverless recovery. The repository does not install a Cron.
 
 On another platform, a systemd timer can invoke the same HTTPS endpoint:
 
@@ -182,12 +197,14 @@ Use platform ingress controls against credential guessing and availability abuse
 1. Back up task/media data and stop every old web/worker writer; old writers
    ignore revisions/tombstones. Keep generation disabled.
 2. After separate production authorization, apply
-   `migrations/0001_durable_task_lifecycle.sql` and
-   `migrations/0002_provider_runtime_catalog.sql`, in that order, with
+   `migrations/0001_durable_task_lifecycle.sql`,
+   `migrations/0002_provider_runtime_catalog.sql` and
+   `migrations/0003_workflow_queue.sql`, in that order when missing, with
    `psql -X -v ON_ERROR_STOP=1`.
    Supply the connection through a restricted PostgreSQL service/env file;
    never print it. Legacy file history is normalized by the new reader. Do not
-   bulk-upload old media during startup.
+   bulk-upload old media during startup. Task schema version is now 3; do not
+   reapply older migration 0001 after the forward migration.
 3. Configure HTTPS/access and one supported profile. Missing configuration/schema
    stops startup with `ERR_STARTUP_CONFIGURATION_OR_STORAGE`; there is no open
    fallback. A production build does not need production credentials.
@@ -195,14 +212,19 @@ Use platform ingress controls against credential guessing and availability abuse
    download requests are denied, as are cross-origin/missing-Origin mutations.
    Public `GET /api/health` returns only `{"status":"alive"}`.
 5. Authenticated `/api/ready` validates configuration and performs a current task
-   store read. `scheduler_heartbeat:"unverified"` is deliberate. Verify recurring
-   scheduler logs and demonstrate observation of an already accepted synthetic
-   task after restart before claiming execution readiness.
-6. Monitor `[task-scheduler] completed`/`deferred`, missing successful ticks over
-   several expected intervals, old pending tasks, storage errors and recovery-
+   store read. Workflow mode reports `scheduler_heartbeat:"not_applicable"` and
+   `workflow_execution:"unverified"`. Verify a synthetic Workflow on the target
+   deployment. For external mode, verify recurring scheduler delivery instead.
+   After switching profiles, POST an empty body to the authenticated
+   `/api/internal/reconcile-workflows` with exact Origin to arm observers for
+   previously accepted tasks (at most 20 per call; follow `nextCursor` via
+   `?after=<nextCursor>`). Duplicate runs are safe for
+   provider spending but consume extra Workflow events.
+6. Monitor Workflow runs/failures and usage (or `[task-scheduler]` in external
+   mode), old pending tasks, storage errors and recovery-
    required tasks. Logs contain only timings/counts/safe codes. Do not add raw
    upstream bodies, prompts, URLs or secrets. Monitoring is not provisioned here.
-7. Confirm durable storage/public delivery and provider quotas, then explicitly
+7. Confirm durable storage and the chosen delivery policy and provider quotas, then explicitly
    enable `GENERATION_ENABLED=true` and reload. Paid smoke tests or real uploads
    require separate authorization; local checks do not perform them.
 
@@ -230,13 +252,14 @@ delete durable objects merely to roll back code.
 
 - [Next.js authentication](https://nextjs.org/docs/app/guides/authentication) and
   [instrumentation](https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation)
-- [Vercel cron management](https://vercel.com/docs/cron-jobs/manage-cron-jobs),
-  [cron plans](https://vercel.com/docs/cron-jobs/usage-and-pricing) and
+- [Workflow integration](https://workflow-sdk.dev/docs/getting-started/next),
+  [deployment](https://workflow-sdk.dev/docs/deploying),
+  [pricing](https://vercel.com/docs/workflows/pricing) and
   [function limits](https://vercel.com/docs/functions/limitations)
 - [HTTP Basic](https://www.rfc-editor.org/rfc/rfc7617.txt) and
   [OWASP CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
 - [NGINX limits](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html) and
   [Vercel WAF](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting)
 
-Local synthetic tests do not establish production TLS/cron delivery, disk mount
-durability, Cloudinary availability/privacy or configured provider quotas.
+Local synthetic tests do not establish production TLS/Workflow delivery, disk mount
+durability, real Blob/S3/Cloudinary delivery or configured provider quotas.

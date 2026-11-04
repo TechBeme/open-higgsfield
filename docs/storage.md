@@ -12,7 +12,83 @@ For one persistent server process, set `ASSET_STORAGE_MODE=local` and an absolut
 explicitly. Local development without database/serverless configuration defaults
 to local mode. Back up task history and the uploads/downloads directories together.
 
-With `DATABASE_URL`, Vercel or a distributed deployment, set:
+With `DATABASE_URL`, Vercel or a distributed deployment, use **Vercel Blob**
+(recommended on Vercel) or **S3**. These profiles store both uploaded references
+and generated images/videos remotely, without relying on ephemeral local disk.
+
+### Vercel Blob
+
+Create a **private** Blob store under Storage in the Vercel dashboard and connect
+it to the project. The integration supplies `BLOB_READ_WRITE_TOKEN`. Configure:
+
+```dotenv
+ASSET_STORAGE_MODE=vercel-blob
+ASSET_DELIVERY_MODE=private
+BLOB_READ_WRITE_TOKEN=<server-side-store-token>
+```
+
+The store ID is inferred from the token; `BLOB_STORE_ID` is an optional override.
+The store's actual access setting must match `ASSET_DELIVERY_MODE`. The app uses
+the official Blob SDK, immutable content-addressed uploads and exact-path,
+GET-only delegated signed URLs. No store-wide read token is sent to a browser or
+AI provider. A public Blob store is supported only with explicit
+`ASSET_DELIVERY_MODE=public`; anyone with those object URLs can access originals.
+
+### S3 and compatible services
+
+```dotenv
+ASSET_STORAGE_MODE=s3
+ASSET_DELIVERY_MODE=private
+S3_BUCKET=your-private-media-bucket
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=<server-side-access-key>
+S3_SECRET_ACCESS_KEY=<server-side-secret>
+```
+
+Use a private bucket and an IAM policy restricted to `s3:GetObject` and
+`s3:PutObject` on `arn:aws:s3:::BUCKET/open-higgsfield/*`; bucket listing and
+object deletion are not needed by this adapter. With no explicit credentials,
+the official AWS SDK uses its native credential chain (e.g. an IAM role).
+`S3_SESSION_TOKEN` supports temporary credentials. Their expiry can shorten the
+validity of a signed URL, even if a longer TTL was requested.
+
+For compatible storage, set `S3_ENDPOINT` to a public HTTPS origin (no path,
+credentials or port), `S3_REGION` as required by that service, and optionally
+`S3_FORCE_PATH_STYLE=true`. Public delivery requires explicit
+`ASSET_DELIVERY_MODE=public` and `S3_PUBLIC_BASE_URL` as an HTTPS origin mapped to
+the bucket root. The app does not change bucket ACLs or policies. In public mode,
+inline/provider URLs use that origin; attachment URLs use native S3 signing.
+Compatibility depends on conditional PUT, HEAD and SigV4 support.
+
+### Private delivery and lifecycle
+
+Output records contain stable references, not signed URLs. Browser-facing DTOs
+retain `/api/download/...` URLs; inputs retain `/api/uploaded/...` URLs. After app
+authentication, these routes redirect to a fresh signed object URL, valid for
+15 minutes. Downloads use the storage provider's native attachment option.
+Reusing media in a generation creates a fresh 24-hour provider link. These links
+are bearer credentials: anyone receiving one can read that exact file until it
+expires. A generated link is intentionally accessible to the selected AI
+provider, without giving it the workspace credential. Expired links can be
+renewed through the stable application routes.
+
+Known managed objects redirect directly, including large videos and byte-range
+playback, avoiding Vercel's response-body limit. The storage service handles
+ranges; a 307 redirect preserves the request method/headers. No response stream
+of large managed media passes through the app function. Uploaded images retain
+the existing JPEG normalization and media validation. Storage and signing errors
+are returned as canonical codes, with no SDK messages or credentials.
+
+Writes use deterministic task/index/content-hash keys and refuse overwrites;
+existing objects must match size/MIME. New task references are published only
+after all outputs finish. Partial failures can leave unreferenced objects.
+Deleting a gallery entry does **not** delete its Blob/S3 object, matching the
+existing retention behavior. Configure lifecycle/retention and monitor usage
+separately. No bulk deletion, storage migration or automatic bucket creation is
+performed. Changing store/bucket/backend does not migrate old references;
+restore the previous configuration or migrate them explicitly.
+
+### Legacy Cloudinary profile
 
 ```dotenv
 ASSET_STORAGE_MODE=cloudinary
@@ -110,20 +186,27 @@ application download reference. It no longer returns a server filesystem path;
 it does not copy already stored media or migrate legacy records.
 
 Back up task data and files before adopting the new profile. Configure durable
-storage and public delivery before enabling paid generation. Rollback must keep
+storage and verify the chosen delivery policy before enabling paid generation. Rollback must keep
 new durable URLs readable: the old reader cannot reliably download Cloudinary-only
 records. Stop writes and restore a matching backup/application together for a
 full rollback, reconciling paid tasks created since backup. Never delete durable
 objects as part of code rollback. The task schema/writer migration is documented
 in the [production runbook](production.md#activation-monitoring-and-recovery).
 
-Local verification uses synthetic media, a fake Cloudinary boundary, native
+Local verification uses synthetic media, mocked Blob/S3/Cloudinary boundaries,
+real offline AWS SDK signing, native
 HTTP/DNS boundary doubles, and actual local files. It does not establish that a
 production volume is persistent, Cloudinary account delivery works, or a real
 provider generation succeeds.
 
 ## Official references
 
+- [Vercel Blob SDK](https://vercel.com/docs/vercel-blob/using-blob-sdk),
+  [private storage](https://vercel.com/docs/vercel-blob/private-storage),
+  [signed URLs](https://vercel.com/docs/vercel-blob/vercel-signed-urls)
+- [AWS S3 conditional writes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html),
+  [presigned URLs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html),
+  [JavaScript SDK examples](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/javascript_s3_code_examples.html)
 - [Cloudinary signed upload API](https://cloudinary.com/documentation/image_upload_api_reference)
   and [media access control](https://cloudinary.com/documentation/control_access_to_media)
 - [OWASP SSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)

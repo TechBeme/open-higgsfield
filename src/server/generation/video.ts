@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-import { readModelMedia, uploadModelMedia } from "@/server/generation/media-input";
+import { generationReference, readModelMedia, uploadModelMedia } from "@/server/generation/media-input";
 import { parseModelFields, validateModelParams } from "@/models/parameter-schema";
 import { getMagnificContract } from "@/server/catalog/magnific";
 import { getRuntimeCapability } from "@/server/catalog/runtime";
@@ -94,8 +94,8 @@ async function prepareGeneration(form: FormData, signal: AbortSignal) {
     let frontalUrl = String(form.get(`url_elem_${i}_frontal`) ?? "").trim();
     if (frontalFile && frontalFile.size > 0) {
       const buffer = await inputFile(frontalFile, "image/jpeg", signal);
-      frontalUrl = (await processImageUpload(buffer, { signal })).remoteUrl;
-    } else if (frontalUrl) frontalUrl = (await resolveUrl(frontalUrl, { signal })).remoteUrl;
+      frontalUrl = generationReference(await processImageUpload(buffer, { signal }));
+    } else if (frontalUrl) frontalUrl = generationReference(await resolveUrl(frontalUrl, { signal }));
     const refUrls: string[] = [];
     for (let j = 0; j < refCount; j++) {
       signal.throwIfAborted();
@@ -104,8 +104,8 @@ async function prepareGeneration(form: FormData, signal: AbortSignal) {
       let refUrl = String(form.get(`url_elem_${i}_ref_${j}`) ?? "").trim();
       if (refFile && refFile.size > 0) {
         const buffer = await inputFile(refFile, "image/jpeg", signal);
-        refUrl = (await processImageUpload(buffer, { signal })).remoteUrl;
-      } else if (refUrl) refUrl = (await resolveUrl(refUrl, { signal })).remoteUrl;
+        refUrl = generationReference(await processImageUpload(buffer, { signal }));
+      } else if (refUrl) refUrl = generationReference(await resolveUrl(refUrl, { signal }));
       if (refUrl) refUrls.push(refUrl);
     }
     const element: { frontal_image_url?: string; reference_image_urls?: string[] } = {};

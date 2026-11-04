@@ -9,7 +9,7 @@ const root = path.resolve(import.meta.dirname, "..");
 const sourceRoot = path.join(root, "src");
 const files = fs.readdirSync(sourceRoot, { recursive: true }).filter(file => /\.(ts|tsx)$/.test(file));
 const graph = new Map();
-const serverDependencies = new Set(["@neondatabase/serverless", "@google/genai", "@ai-sdk/gateway", "ai", "sharp", "formidable"]);
+const serverDependencies = new Set(["@neondatabase/serverless", "@google/genai", "@ai-sdk/gateway", "ai", "sharp", "formidable", "@vercel/blob", "@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner", "workflow", "workflow/api"]);
 const builtins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]));
 
 for (const file of files) {

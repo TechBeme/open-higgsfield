@@ -4,6 +4,11 @@ import type { ModelCapabilities } from "@/models/capabilities/types";
 import type { CanonicalMediaInputs } from "@/models/canonical";
 import { inputFile } from "@/server/generation/input";
 import { processFileUpload, processImageUpload, resolveUrl } from "@/server/media/input-upload";
+import { taskWorkerMode } from "@/server/tasks/runtime";
+
+export function generationReference(media: { localUrl: string; remoteUrl: string }): string {
+    return taskWorkerMode() === "workflow" ? media.localUrl : media.remoteUrl;
+}
 
 export interface PreparedSlot { id: string; kind: "image" | "video" | "audio"; values: Array<File | string>; preserveImage?: boolean }
 
@@ -38,7 +43,7 @@ export async function uploadModelMedia(slots: PreparedSlot[], signal: AbortSigna
                 : slot.kind === "image" && !slot.preserveImage
                     ? await processImageUpload(await inputFile(value, mime, signal), { signal })
                     : await processFileUpload(await inputFile(value, mime, signal), value.name, value.type || mime, { signal });
-            remote.push(result.remoteUrl); local.push(result.localUrl);
+            remote.push(generationReference(result)); local.push(result.localUrl);
         }
         if (!remote.length) continue;
         media.slots![slot.id] = remote; localUrls[slot.id] = local;

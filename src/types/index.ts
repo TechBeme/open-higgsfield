@@ -1,5 +1,5 @@
 import type { ProviderId } from "@/providers/types";
-export type TaskPhase = "submitting" | "polling" | "materializing" | "paused" | "submission_unknown" | "terminal";
+export type TaskPhase = "queued" | "submitting" | "polling" | "materializing" | "paused" | "submission_unknown" | "terminal";
 import type { ModelCapabilities } from "@/models/capabilities/types";
 
 export type MediaType = "video" | "image";

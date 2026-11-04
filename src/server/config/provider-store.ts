@@ -170,10 +170,14 @@ export async function getConnectedProviderIds(): Promise<Set<ProviderId>> {
     }).map(({ id }) => id));
 }
 
-export async function getProviderConnection(id: string): Promise<ProviderConnectionContext | undefined> {
+export async function getProviderConnection(id: string, options: { forSubmission?: boolean } = {}): Promise<ProviderConnectionContext | undefined> {
     if (id.startsWith("env:")) {
         const providerId = id.slice(4);
-        return isProviderId(providerId) ? connectionFromEnv(providerId) : undefined;
+        if (!isProviderId(providerId)) return undefined;
+        // A queued request must not bypass a saved override added since admission.
+        // Observation keeps the original account so an accepted operation can be found.
+        if (options.forSubmission && (await readConfig()).connections.some(entry => entry.providerId === providerId)) return undefined;
+        return connectionFromEnv(providerId);
     }
     let config: StoredConfig;
     try { config = await readConfig(); } catch (error) { if (error instanceof Error && error.message === "ERR_PROVIDER_CONFIG_SCHEMA_REQUIRED") return undefined; throw error; }

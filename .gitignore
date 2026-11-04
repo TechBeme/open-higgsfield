@@ -17,6 +17,8 @@
 # next.js
 /.next/
 /.next-e2e/
+/.workflow-data/
+/src/app/.well-known/workflow/
 /out/
 
 # production
@@ -74,3 +76,4 @@ next-env.d.ts
 /.claude/
 /.cursor/
 /.github/instructions/
+/.swc

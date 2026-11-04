@@ -4,12 +4,13 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import type { AnyTask } from "@/types";
 import { assertAssetId, DOWNLOADS_DIR, openLocalMedia, UPLOADS_DIR, validateCloudinaryUrl } from "@/server/media/storage";
+import { inputKeyForFilename, isStoredObjectReference, objectReference, objectStorageMode, storedObjectUrl } from "./object-storage";
 import { assertInputFileSize, detectMediaMime, fetchRemoteMedia, mediaByteLimit, mediaExtension,
     SERVERLESS_RESPONSE_MAX_BYTES, transferSignal, type TransferOptions } from "@/server/media/transfer";
 
 type LocalSource = Awaited<ReturnType<typeof openLocalMedia>>;
 type ByteSource = { data: Buffer; size: number; mimeType: string };
-type Source = (LocalSource | ByteSource | { redirect: string }) & { signal: AbortSignal };
+type Source = (LocalSource | ByteSource | { redirect: string; cloudinary?: boolean }) & { signal: AbortSignal };
 
 export const PRIVATE_MEDIA_HEADERS = {
     "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
@@ -74,7 +75,7 @@ function durableRedirect(value: string, task: AnyTask, index: number): string | 
     } catch { return undefined; }
 }
 
-export async function taskAssetSource(task: AnyTask, index: number, options: TransferOptions = {}): Promise<Source> {
+export async function taskAssetSource(task: AnyTask, index: number, options: TransferOptions & { providerReference?: boolean; attachment?: boolean } = {}): Promise<Source> {
     assertAssetId(task.task_id);
     if (task.gallery?.removed.includes(index)) throw new AssetError("ERR_ASSET_NOT_FOUND", 404);
     assetIndex(index, taskAssetCount(task));
@@ -97,8 +98,13 @@ export async function taskAssetSource(task: AnyTask, index: number, options: Tra
         return { ...source, signal };
     }
     if (!value || value.startsWith("/")) throw new AssetError("ERR_ASSET_NOT_FOUND", 404);
+    if (isStoredObjectReference(value)) {
+        const expected = new RegExp(`^/open-higgsfield/generated/${task.task_id}/${index}_[a-f0-9]{64}\\.(?:${task.media_type === "image" ? "jpg|jpeg|png|webp|gif|avif" : "mp4|webm|mov"})$`);
+        if (!expected.test(new URL(value).pathname)) throw new AssetError("ERR_UNSAFE_ASSET_PATH");
+        return { redirect: await storedObjectUrl(value, { ...options, signal }), signal };
+    }
     const redirect = durableRedirect(value, task, index);
-    if (redirect) return { redirect, signal };
+    if (redirect) return { redirect, cloudinary: true, signal };
     const maxBytes = process.env.VERCEL ? SERVERLESS_RESPONSE_MAX_BYTES : mediaByteLimit(`${task.media_type}/`);
     try {
         const fetched = await fetchRemoteMedia(value, { signal, maxBytes });
@@ -132,7 +138,7 @@ async function sourceResponse(source: Source, request: Request, taskId: string, 
         source.signal.throwIfAborted();
         if ("redirect" in source) {
             const url = new URL(source.redirect);
-            if (attachment) url.pathname = url.pathname.replace("/upload/", `/upload/fl_attachment:${taskId}/`);
+            if (attachment && source.cloudinary) url.pathname = url.pathname.replace("/upload/", `/upload/fl_attachment:${taskId}/`);
             return new Response(null, { status: 307, headers: { ...PRIVATE_MEDIA_HEADERS, Location: url.toString() } });
         }
         let range: ReturnType<typeof parseByteRange>;
@@ -167,17 +173,21 @@ async function sourceResponse(source: Source, request: Request, taskId: string, 
 }
 
 export async function taskAssetResponse(task: AnyTask, index: number, request: Request, attachment: boolean): Promise<Response> {
-    return sourceResponse(await taskAssetSource(task, index, { signal: request.signal }), request, task.task_id, attachment);
+    return sourceResponse(await taskAssetSource(task, index, { signal: request.signal, attachment }), request, task.task_id, attachment);
 }
 
 export async function uploadedAssetResponse(filename: string, request: Request): Promise<Response> {
     const signal = transferSignal(request.signal);
     if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/.test(filename)) throw new AssetError("ERR_UNSAFE_ASSET_PATH");
+    if (objectStorageMode()) {
+        const redirect = await storedObjectUrl(objectReference(inputKeyForFilename(filename)), { signal });
+        return sourceResponse({ redirect, signal }, request, path.parse(filename).name, false);
+    }
     return sourceResponse(await openLocalMedia(path.join(UPLOADS_DIR, filename), UPLOADS_DIR, { signal }), request, path.parse(filename).name, false);
 }
 
 export async function reusableTaskAsset(task: AnyTask, index: number, options: TransferOptions = {}): Promise<{ url: string } | { data: Buffer; mimeType: string }> {
-    const source = await taskAssetSource(task, index, options);
+    const source = await taskAssetSource(task, index, { ...options, providerReference: true });
     if ("redirect" in source) return { url: source.redirect };
     if ("data" in source) return { data: source.data, mimeType: source.mimeType };
     try { return { data: await source.handle.readFile({ signal: source.signal }), mimeType: source.mimeType }; }

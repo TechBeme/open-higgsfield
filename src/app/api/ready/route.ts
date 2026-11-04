@@ -18,6 +18,7 @@ export async function GET(request: Request) {
         });
         return applyWorkspaceHeaders(Response.json({ ready: true, configuration: "valid", task_store: "available",
             profile: configuration.profile, worker_mode: configuration.workerMode,
-            scheduler_heartbeat: "unverified" }));
+            scheduler_heartbeat: configuration.workerMode === "workflow" ? "not_applicable" : "unverified",
+            ...(configuration.workerMode === "workflow" ? { workflow_execution: "unverified" } : {}) }));
     } catch { return accessFailure("ERR_NOT_READY", 503); }
 }

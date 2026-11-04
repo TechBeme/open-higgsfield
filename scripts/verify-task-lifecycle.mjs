@@ -296,8 +296,8 @@ test("database schema and claim share cancellation even when the transport ignor
         const loader = createModuleLoader({ env: { DATABASE_URL: "postgres://synthetic.invalid/test", TASK_WORKER_MODE: "external" }, mocks: {
             "@neondatabase/serverless": { neon: () => ({ query: async (sql, _values, options) => {
                 queries++; assert.ok(options.fetchOptions.signal);
-                if (sql.startsWith("SELECT version") && stage === "claim") return [{ version: 2 }];
-                await wait(1_400); return sql.startsWith("SELECT version") ? [{ version: 2 }] : [];
+                if (sql.startsWith("SELECT version") && stage === "claim") return [{ version: 3 }];
+                await wait(1_400); return sql.startsWith("SELECT version") ? [{ version: 3 }] : [];
             } }) },
             "@/server/providers/registry": { getProvider: () => ({ poll: async () => { polls++; return { status: "IN_PROGRESS" }; } }) },
             "@/server/media/generated-assets": { attachGeneratedAssets: async () => {} },

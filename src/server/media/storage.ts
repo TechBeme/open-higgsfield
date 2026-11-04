@@ -6,6 +6,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { STORAGE_ROOT } from "@/server/config/storage-paths";
 import { withAbort } from "@/server/media/safe-url";
+import { inputKeyForFilename, inputObjectKey, objectReference, objectStorageMode, storedObjectUrl, uploadObject } from "@/server/media/object-storage";
 import { assertInputFileSize, detectMediaMime, fetchRemoteMedia, mediaExtension, mediaMimeForExtension,
     readBoundedResponse, transferSignal, type TransferOptions } from "@/server/media/transfer";
 
@@ -86,6 +87,11 @@ export async function uploadCloudinary(buffer: Buffer, publicId: string, mimeTyp
 }
 
 export async function uploadToTmpfiles(buffer: Buffer, _filename: string, mimeType: string, options: TransferOptions = {}): Promise<string> {
+    if (objectStorageMode()) {
+        const mime = detectMediaMime(buffer, mimeType);
+        const reference = await uploadObject(buffer, inputObjectKey(buffer, mime), mime, options);
+        return storedObjectUrl(reference, { ...options, providerReference: true });
+    }
     const hash = createHash("sha256").update(buffer).digest("hex");
     return uploadCloudinary(buffer, `open-higgsfield/inputs/${hash}`, mimeType, options);
 }
@@ -200,6 +206,7 @@ export async function downloadUrl(url: string, taskId: string, index: number, op
 export async function resolveLocalUpload(url: string, options: TransferOptions = {}): Promise<string> {
     if (!url.startsWith("/api/uploaded/")) return url;
     const filename = url.slice("/api/uploaded/".length);
+    if (objectStorageMode()) return storedObjectUrl(objectReference(inputKeyForFilename(filename)), { ...options, providerReference: true });
     const buffer = await readLocalUpload(filename, options);
     return uploadToTmpfiles(buffer, filename, mediaMimeForExtension(path.extname(filename)), options);
 }

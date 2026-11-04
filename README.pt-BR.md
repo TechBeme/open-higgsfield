@@ -8,7 +8,7 @@
   Gere com modelos da Magnific, Google AI Studio, Google Vertex AI, Vercel AI Gateway, ToAPIs e Runware em um único estúdio criativo.
 
   <p>
-    <a href="https://openhiggs.techbe.me"><strong>Demo ao vivo</strong></a>
+    <a href="https://openhiggs.techbe.me"><strong>Prévia da interface</strong></a>
     |
     <a href="#por-que-open-higgsfield">Recursos</a>
     |
@@ -33,6 +33,8 @@
     <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTechBeme%2Fopen-higgsfield"><img alt="Deploy com Vercel" src="https://vercel.com/button" /></a>
   </p>
 </div>
+
+O site hospedado é uma prévia da interface; a geração pode estar desativada. Para gerar imagens e vídeos, execute sua própria instalação e conecte suas contas dos provedores.
 
 ![Estúdio do Open-Higgsfield em português](docs/images/open-higgsfield-studio-pt-br.png)
 
@@ -134,7 +136,7 @@ Veja [Provedores e modelos](docs/providers.md) para credenciais e instruções d
 - SWR para dados no cliente e next-intl para inglês, português brasileiro e espanhol
 - Catálogo de capacidades e contratos de geração comuns aos provedores
 - Magnific API, Google Gen AI SDK, Vertex AI, Vercel AI Gateway, ToAPIs e Runware
-- Cloudinary para fluxos que exigem URLs públicas de mídia
+- Mídia privada no Vercel Blob/S3 e URLs de referência assinadas; compatibilidade com Cloudinary legado
 - Histórico em PostgreSQL/Neon ou armazenamento local explícito com um único processo
 
 ## Arquitetura
@@ -169,7 +171,7 @@ A interface lê as capacidades dos modelos. O backend converte cada solicitaçã
 - Node.js 22.23.4 ou mais recente dentro da linha Node 22
 - npm 10+
 - Credencial de pelo menos um provedor
-- Cloudinary apenas para fluxos que exigem URLs públicas de referência
+- Para instalações distribuídas: credenciais do Vercel Blob ou S3 para mídia e referências persistentes; Cloudinary legado é opcional
 
 ### 1. Clone e instale
 
@@ -223,7 +225,11 @@ GOOGLE_SERVICE_ACCOUNT_JSON=
 AI_GATEWAY_API_KEY=
 TOAPIS_API_KEY=
 RUNWARE_API_KEY=
-CLOUDINARY_URL=
+
+# Mídia e referências persistentes (Blob privado)
+# ASSET_STORAGE_MODE=vercel-blob
+# ASSET_DELIVERY_MODE=private
+# BLOB_READ_WRITE_TOKEN=
 ```
 
 Nunca use `NEXT_PUBLIC_` em credenciais de provedores. Elas são lidas somente no servidor.
@@ -242,13 +248,13 @@ Configure o acesso de produção e o perfil de processo único no [guia de opera
 
 ## Deploy na Vercel
 
-Produção exige credencial do operador, origem HTTPS, PostgreSQL migrado, mídia pública no Cloudinary e execução recorrente. O cron por minuto incluído exige **Vercel Pro ou Enterprise**. Novas gerações ficam desativadas até configurar `GENERATION_ENABLED=true`.
+Produção exige credencial do operador, origem HTTPS, PostgreSQL migrado, mídia persistente no Vercel Blob ou S3 e **Vercel Workflows** para envio, acompanhamento e armazenamento das gerações em segundo plano. Não é necessário cron por minuto nem agendamento no GitHub. Veja [execução em segundo plano](docs/background-execution.md) para configuração e custos de uso. Novas gerações ficam desativadas até configurar `GENERATION_ENABLED=true`.
 
-Cada deploy é um workspace BYOK de um operador: quem tem a credencial acessa todas as tarefas e usa as mesmas contas dos provedores. Não há isolamento por usuário, orçamento monetário ou limite global de requisições no aplicativo. Configure cotas dos provedores e proteção na entrada. Arquivos do Cloudinary continuam públicos por URL.
+Cada deploy é um workspace BYOK de um operador: quem tem a credencial acessa todas as tarefas e usa as mesmas contas dos provedores. Não há isolamento por usuário, orçamento monetário ou limite global de requisições no aplicativo. Configure cotas dos provedores e proteção na entrada. Originais no Blob/S3 são privados por padrão, com links temporários para exibição e referências dos provedores. Veja o [guia de armazenamento](docs/storage.md).
 
-Siga o [guia de operação](docs/production.md) antes de iniciar Docker ou publicar na Vercel; ele descreve configuração, migração, HTTPS, agendamento e recuperação.
+Siga o [guia de operação](docs/production.md) antes de iniciar Docker ou publicar na Vercel; ele descreve configuração, migração, HTTPS, validação do Workflow e recuperação.
 
-Para atualizar um deploy existente, consulte o [checklist da Vercel](docs/deployment.md#updating-an-existing-vercel-deployment): integração Git, variáveis, migrações e validação. Estas alterações da galeria e do layout mobile não exigem novas variáveis de ambiente nem migrações de banco.
+Para atualizar um deploy existente, consulte o [checklist da Vercel](docs/deployment.md#updating-an-existing-vercel-deployment): integração Git, variáveis, migrações e validação. Esta atualização exige a migração `0003_workflow_queue.sql` e o perfil de execução Workflow; siga o checklist antes de publicar.
 
 ## Comandos
 
