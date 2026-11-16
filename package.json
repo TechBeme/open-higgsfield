@@ -47,7 +47,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1161.0",
     "@base-ui/react": "^1.9.0",
     "@google/genai": "^2.31.0",
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^7.0.1",
     "@neondatabase/serverless": "^1.2.0",
     "@vercel/blob": "^2.8.2",
     "ai": "^7.0.153",
