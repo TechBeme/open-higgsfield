@@ -5,6 +5,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { AnyTask, MediaType } from "@/types";
 import { STORAGE_ROOT } from "@/server/config/storage-paths";
+import { syncDirectory } from "@/server/config/durable-fs";
 import { claimPersistedTask, createPersistedTask, deletePersistedTask, ensureTaskSchema, isDatabaseConfigured,
     listPersistedTasks, readPersistedTask, readPublicPersistedTask, updatePersistedTask, applyPersistedGallery, readGalleryTasks, workflowCandidateIds } from "@/server/tasks/postgres";
 import { galleryPatches } from "./gallery";
@@ -63,10 +64,13 @@ async function writeFile(rows: Map<string, TaskRecord>, signal?: AbortSignal): P
         finally { await handle.close(); }
         await waitFor(signal, () => fs.rename(temp, TASKS_FILE));
         signal?.throwIfAborted();
-        const directory = await fs.open(path.dirname(TASKS_FILE), "r");
-        try { await waitFor(signal, () => directory.sync()); } finally { await directory.close(); }
-    } catch {
+        await waitFor(signal, () => syncDirectory(path.dirname(TASKS_FILE)));
+    } catch (error) {
         await fs.unlink(temp).catch(() => undefined);
+        if (!signal?.aborted) {
+            const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
+            console.error("[task-store] local task history write failed", { code: code ?? "unknown", syscall });
+        }
         throw new Error("ERR_TASK_STORAGE_UNAVAILABLE");
     }
 }
