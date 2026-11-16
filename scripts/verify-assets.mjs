@@ -6,7 +6,7 @@ import os from "node:os";
 import { PassThrough } from "node:stream";
 import { EventEmitter } from "node:events";
 import { createHash } from "node:crypto";
-import { createModuleLoader } from "./test-module-loader.mjs";
+import { createModuleLoader, windowsDirectoryFs } from "./test-module-loader.mjs";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jmO0AAAAASUVORK5CYII=", "base64");
 const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from("ftypmp42"), Buffer.alloc(24)]);
@@ -157,7 +157,7 @@ async function storageHarness(t, options = {}) {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "asset-storage-"));
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
     const loader = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: dir, ...options.env },
-        globals: options.globals ?? {}, mocks: options.mocks ?? {} });
+        globals: options.globals ?? {}, mocks: options.mocks ?? {}, platform: options.platform });
     return { dir, loader, upload: loader.load("@/server/media/storage"), assets: loader.load("@/server/media/generated-assets"), source: loader.load("@/server/media/asset-source") };
 }
 
@@ -256,6 +256,17 @@ test("legacy data fallback works when a single attachment's local file is missin
     assert.deepEqual(await multiple.json(), { urls: ["/api/download/legacy?index=0", "/api/download/legacy?index=1"] });
     task.result_urls = ["data:text/html;base64,PGh0bWw+"];
     await assert.rejects(h.source.taskAssetSource(task, 0), /ERR_UNSUPPORTED_MEDIA_TYPE/);
+});
+
+test("Windows local uploads and generated assets persist although directory handles cannot be flushed (#47)", async (t) => {
+    const posix = await storageHarness(t, { platform: "linux", mocks: { "node:fs/promises": windowsDirectoryFs() } });
+    await assert.rejects(posix.upload.saveInputLocally(png, ".png"), /EPERM/, "the emulated filesystem rejects directory flushes");
+    const h = await storageHarness(t, { platform: "win32", mocks: { "node:fs/promises": windowsDirectoryFs() } });
+    const uploaded = await h.upload.saveInputLocally(png, ".png");
+    assert.deepEqual(await fs.readFile(path.join(h.dir, "uploads", uploaded.split("/").at(-1))), png);
+    const task = taskFixture("windows-asset");
+    await h.assets.attachGeneratedAssets(task, [{ data: png, mimeType: "image/png" }]);
+    assert.deepEqual(await fs.readFile(task.result_paths[0]), png);
 });
 
 test("async video responses implement correct full/range/suffix/If-Range behavior and close handles on cancellation", async (t) => {

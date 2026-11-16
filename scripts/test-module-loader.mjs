@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { createRequire } from "node:module";
@@ -8,13 +9,13 @@ const requireDependency = createRequire(import.meta.url);
 const root = path.resolve(import.meta.dirname, "..");
 
 /** A fresh module graph/global per simulated process; real TS source, injectable boundaries. */
-export function createModuleLoader({ mocks = {}, env = {}, globals = {} } = {}) {
+export function createModuleLoader({ mocks = {}, env = {}, globals = {}, platform = process.platform } = {}) {
     const cache = new Map();
     const context = vm.createContext({
         console, Buffer, URL, URLSearchParams, Response, Request, Headers, FormData, Blob, File,
         AbortSignal, AbortController, DOMException, TextEncoder, TextDecoder, ReadableStream,
         structuredClone, setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask,
-        process: { env, cwd: () => root, pid: process.pid }, ...globals,
+        process: { env, cwd: () => root, pid: process.pid, platform }, ...globals,
     });
     context.global = context;
     function load(relative) {
@@ -43,4 +44,15 @@ export function createModuleLoader({ mocks = {}, env = {}, globals = {} } = {}) 
         return loaded.exports;
     }
     return { load, context, cache };
+}
+
+/** node:fs/promises as Windows behaves: directories open, but flushing their handle fails (FlushFileBuffers -> EPERM). */
+export function windowsDirectoryFs() {
+    return { ...fsPromises, open: async (...args) => {
+        const handle = await fsPromises.open(...args);
+        if ((await handle.stat()).isDirectory()) {
+            handle.sync = async () => { throw Object.assign(new Error("EPERM: operation not permitted, fsync"), { code: "EPERM", syscall: "fsync" }); };
+        }
+        return handle;
+    } };
 }

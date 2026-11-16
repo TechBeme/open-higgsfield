@@ -3,7 +3,7 @@ import test from "node:test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { createModuleLoader } from "./test-module-loader.mjs";
+import { createModuleLoader, windowsDirectoryFs } from "./test-module-loader.mjs";
 
 const caps = { id: "synthetic", provider: "google-ai-studio", provider_model_id: "synthetic", media_slots: [], prompt_required: true };
 const input = (mediaType = "image") => ({ mediaType, modelId: "synthetic", capabilities: caps, params: { prompt: "synthetic lamp" }, media: {} });
@@ -42,7 +42,7 @@ async function harness(t, options = {}) {
         "@/server/media/input-upload": { processImageUpload: async () => { throw new Error("No real uploads in tests"); } },
         ...options.mocks,
     };
-    const loader = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: dir, TASK_WORKER_MODE: "external", ...options.env }, mocks, globals: options.globals });
+    const loader = createModuleLoader({ env: { OPEN_HIGGSFIELD_STORAGE_DIR: dir, TASK_WORKER_MODE: "external", ...options.env }, mocks, globals: options.globals, platform: options.platform });
     const store = loader.load("@/server/tasks/store");
     if (options.wrapStore) mocks["@/server/tasks/store"] = options.wrapStore(store);
     return { dir, state, store, loader, service: loader.load("@/server/generation/service"), poller: loader.load("@/server/tasks/poller") };
@@ -453,4 +453,43 @@ test("retired Freepik tasks pause without polling or replaying on a different pr
     }
     assert.equal(h.state.submitCalls, 0);
     assert.equal(h.state.pollCalls, 0);
+});
+
+test("Windows local storage accepts generation and gallery writes although directory handles cannot be flushed (#47)", async (t) => {
+    const completed = () => fixture("windows-gallery", { status: "COMPLETED", lifecycle_phase: "terminal", next_poll_at: null,
+        result_urls: ["https://synthetic.invalid/a.png", "https://synthetic.invalid/b.png"] });
+    const galleryRequest = () => new Request("http://localhost/api/gallery", { method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "delete", mediaType: "image", items: [{ taskId: "windows-gallery", index: 0 }] }) });
+    const windows = (platform) => {
+        const errors = [];
+        return { errors, options: { platform, mocks: { "node:fs/promises": windowsDirectoryFs() },
+            globals: { console: { ...console, error: (...args) => errors.push(args) } } } };
+    };
+
+    await t.test("the same filesystem behavior on a POSIX code path reproduces the reported 503", async (t) => {
+        const { errors, options } = windows("linux");
+        const h = await harness(t, options);
+        const response = await h.loader.load("src/app/api/generate-image/route.ts").POST(request("generate-image", "image"));
+        assert.equal(response.status, 503);
+        assert.deepEqual(await response.json(), { error: "ERR_TASK_STORAGE_UNAVAILABLE", accepted: false, recovery_required: false });
+        assert.equal(h.state.submitCalls, 0);
+        assert.deepEqual(JSON.parse(JSON.stringify(errors[0][1])), { code: "EPERM", syscall: "fsync" }, "the underlying filesystem error is logged without paths");
+    });
+
+    await t.test("win32 skips the unsupported directory flush and commits every write", async (t) => {
+        const { errors, options } = windows("win32");
+        const h = await harness(t, options);
+        const response = await h.loader.load("src/app/api/generate-image/route.ts").POST(request("generate-image", "image"));
+        const body = await response.json();
+        assert.equal(response.status, 202, JSON.stringify(body)); assert.equal(body.accepted, true);
+        assert.equal(h.state.submitCalls, 1);
+        assert.equal((await h.store.getTask(body.task_id)).provider_operation.taskId, "synthetic-operation");
+        await h.store.createTask(completed());
+        const gallery = await h.loader.load("src/app/api/gallery/route.ts").PATCH(galleryRequest());
+        assert.equal(gallery.status, 200, await gallery.clone().text());
+        assert.deepEqual([...(await h.store.getTask("windows-gallery")).gallery.removed], [0]);
+        const saved = JSON.parse(await fs.readFile(path.join(h.dir, "tasks_history.json"), "utf8"));
+        assert.deepEqual(saved.tasks.map(task => task.task_id).sort(), [body.task_id, "windows-gallery"].sort());
+        assert.deepEqual(errors, []);
+    });
 });

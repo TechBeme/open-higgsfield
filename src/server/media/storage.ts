@@ -5,6 +5,7 @@ import { constants } from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { STORAGE_ROOT } from "@/server/config/storage-paths";
+import { syncDirectory } from "@/server/config/durable-fs";
 import { withAbort } from "@/server/media/safe-url";
 import { inputKeyForFilename, inputObjectKey, objectReference, objectStorageMode, storedObjectUrl, uploadObject } from "@/server/media/object-storage";
 import { assertInputFileSize, detectMediaMime, fetchRemoteMedia, mediaExtension, mediaMimeForExtension,
@@ -152,8 +153,7 @@ async function atomicMediaWrite(filePath: string, buffer: Buffer, signal: AbortS
                 if (!bytes.equals(buffer)) throw new Error("ERR_ASSET_CONTENT_CONFLICT");
             } finally { await existing.handle.close(); }
         }
-        const directory = await fs.open(path.dirname(filePath), "r");
-        try { await directory.sync(); } finally { await directory.close(); }
+        await syncDirectory(path.dirname(filePath));
     } finally {
         await handle.close().catch(() => undefined);
         await fs.unlink(temporary).catch(() => undefined);
